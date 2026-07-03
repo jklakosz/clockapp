@@ -57,14 +57,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mainMenu.addItem(editItem)
         let editMenu = NSMenu(title: "Édition")
         editItem.submenu = editMenu
-        editMenu.addItem(withTitle: "Annuler", action: Selector(("undo:")), keyEquivalent: "z")
-        let redo = editMenu.addItem(withTitle: "Rétablir", action: Selector(("redo:")), keyEquivalent: "z")
+        // undo:/redo: have no public declaration to reference with #selector.
+        editMenu.addItem(withTitle: "Annuler", action: NSSelectorFromString("undo:"), keyEquivalent: "z")
+        let redo = editMenu.addItem(withTitle: "Rétablir", action: NSSelectorFromString("redo:"), keyEquivalent: "z")
         redo.keyEquivalentModifierMask = [.command, .shift]
         editMenu.addItem(.separator())
-        editMenu.addItem(withTitle: "Couper", action: Selector(("cut:")), keyEquivalent: "x")
-        editMenu.addItem(withTitle: "Copier", action: Selector(("copy:")), keyEquivalent: "c")
-        editMenu.addItem(withTitle: "Coller", action: Selector(("paste:")), keyEquivalent: "v")
-        editMenu.addItem(withTitle: "Tout sélectionner", action: Selector(("selectAll:")), keyEquivalent: "a")
+        editMenu.addItem(withTitle: "Couper", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "Copier", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Coller", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "Tout sélectionner", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
 
         NSApp.mainMenu = mainMenu
     }
