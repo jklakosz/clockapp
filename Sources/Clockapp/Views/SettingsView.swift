@@ -75,6 +75,23 @@ private struct ClockifyTab: View {
                 ))
             }
 
+            Section(state.t(.sectionUpdates)) {
+                HStack {
+                    Text(state.t(.currentVersionFmt, state.appVersion))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    updateStatusView
+                }
+                HStack {
+                    Button(state.t(.checkUpdates)) { state.checkForUpdates() }
+                        .disabled(state.updateStatus == .checking || state.updateStatus == .installing)
+                    if case .available = state.updateStatus {
+                        Button(state.t(.updInstall)) { state.installUpdate() }
+                            .buttonStyle(.borderedProminent)
+                    }
+                }
+            }
+
             Section(state.t(.sectionLanguage)) {
                 Picker(state.t(.sectionLanguage), selection: Binding(
                     get: { state.settings.language },
@@ -88,6 +105,29 @@ private struct ClockifyTab: View {
         }
         .formStyle(.grouped)
         .onAppear { apiKeyInput = KeychainStore.shared.apiKey ?? "" }
+    }
+
+    @ViewBuilder private var updateStatusView: some View {
+        switch state.updateStatus {
+        case .idle:
+            EmptyView()
+        case .checking:
+            Text(state.t(.updChecking)).font(.caption).foregroundStyle(.secondary)
+        case .upToDate:
+            Label(state.t(.updUpToDate), systemImage: "checkmark.circle.fill")
+                .font(.caption).foregroundStyle(.green)
+        case .available(let v):
+            Label(state.t(.updAvailableFmt, v), systemImage: "arrow.down.circle.fill")
+                .font(.caption).foregroundStyle(.blue)
+        case .installing:
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                Text(state.t(.updInstalling)).font(.caption).foregroundStyle(.secondary)
+            }
+        case .failed(let msg):
+            Label(state.t(.updFailedFmt, msg), systemImage: "exclamationmark.triangle.fill")
+                .font(.caption).foregroundStyle(.red).lineLimit(2)
+        }
     }
 
     @ViewBuilder private var statusView: some View {

@@ -22,6 +22,16 @@ final class AppState: ObservableObject {
     // Runtime status
     @Published var isScreenLocked = false
     @Published var connection: Connection = .disconnected
+    @Published var updateStatus: UpdateStatus = .idle
+
+    enum UpdateStatus: Equatable {
+        case idle
+        case checking
+        case upToDate
+        case available(version: String)
+        case installing
+        case failed(String)
+    }
 
     enum Connection: Equatable {
         case disconnected
@@ -74,6 +84,12 @@ final class AppState: ObservableObject {
         }
         if clockify.isConfigured {
             Task { await connect() }
+        }
+
+        // Silent update check shortly after launch.
+        Task {
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            checkForUpdates(silent: true)
         }
     }
 
@@ -361,6 +377,42 @@ final class AppState: ObservableObject {
     func project(for id: String?) -> Project? {
         guard let id else { return nil }
         return projects.first { $0.id == id }
+    }
+
+    // MARK: - Updates
+
+    private var pendingRelease: UpdaterService.Release?
+
+    var appVersion: String { UpdaterService.currentVersion ?? "dev" }
+
+    /// silent: only surfaces "available" (used at launch); a manual check shows everything.
+    func checkForUpdates(silent: Bool = false) {
+        if !silent { updateStatus = .checking }
+        Task {
+            do {
+                if let release = try await UpdaterService.checkForUpdate() {
+                    pendingRelease = release
+                    updateStatus = .available(version: release.version)
+                } else if !silent {
+                    updateStatus = .upToDate
+                }
+            } catch {
+                if !silent { updateStatus = .failed(error.localizedDescription) }
+            }
+        }
+    }
+
+    func installUpdate() {
+        guard let release = pendingRelease else { return }
+        updateStatus = .installing
+        Task {
+            do {
+                let appURL = try await UpdaterService.downloadAndInstall(release)
+                UpdaterService.relaunch(appURL)
+            } catch {
+                updateStatus = .failed(error.localizedDescription)
+            }
+        }
     }
 
     // MARK: - Launch at login

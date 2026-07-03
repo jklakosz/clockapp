@@ -164,6 +164,13 @@ struct MenuContentView: View {
         HStack {
             connectionBadge
             Spacer()
+            if case .available(let v) = state.updateStatus {
+                Button { state.openSettings?() } label: {
+                    Image(systemName: "arrow.down.circle.fill").foregroundStyle(.blue)
+                }
+                .buttonStyle(.borderless)
+                .help(state.t(.updAvailableFmt, v))
+            }
             Button { state.openSettings?() } label: { Image(systemName: "gearshape") }
                 .buttonStyle(.borderless).help(state.t(.settings))
             Button { NSApp.terminate(nil) } label: { Image(systemName: "power") }

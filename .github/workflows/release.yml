@@ -1,0 +1,59 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      # The updater on users' machines only installs binaries signed by the pinned
+      # "Clockapp Dev" certificate, so CI must sign with that exact identity.
+      - name: Import signing certificate
+        env:
+          P12_B64: ${{ secrets.SIGNING_CERT_P12 }}
+          P12_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
+        run: |
+          echo "$P12_B64" | base64 -d > /tmp/cert.p12
+          security create-keychain -p ci build.keychain
+          security set-keychain-settings -lut 21600 build.keychain
+          security unlock-keychain -p ci build.keychain
+          security import /tmp/cert.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k ci build.keychain
+          security list-keychains -d user -s build.keychain login.keychain
+          rm /tmp/cert.p12
+
+      - name: Set version from tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          sed -i '' "s/^VERSION=\".*\"/VERSION=\"$VERSION\"/" scripts/build-app.sh
+
+      - name: Build .app and DMG
+        run: |
+          ./scripts/package-dmg.sh
+          ditto -c -k --keepParent dist/Clockapp.app "dist/Clockapp-$VERSION.zip"
+
+      # Fail the release if the app isn't signed with the pinned identity —
+      # otherwise the auto-updater would reject it on every user's machine.
+      - name: Verify pinned signature
+        run: |
+          codesign --verify --deep --strict \
+            -R='identifier "com.jules.clockapp" and certificate leaf = H"e0c2110b5834b00bf1c408d7b95765486ee08d38"' \
+            dist/Clockapp.app
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "dist/Clockapp-$VERSION.zip" \
+            "dist/Clockapp-$VERSION.dmg" \
+            --title "Clockapp $VERSION" \
+            --generate-notes

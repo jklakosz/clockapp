@@ -1,5 +1,10 @@
 # Clockapp
 
+[![CI](https://github.com/jklakosz/clockapp/actions/workflows/ci.yml/badge.svg)](https://github.com/jklakosz/clockapp/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/jklakosz/clockapp?include_prereleases&label=release)](https://github.com/jklakosz/clockapp/releases/latest)
+[![Platform](https://img.shields.io/badge/platform-macOS%2013%2B-blue)](#)
+[![Swift](https://img.shields.io/badge/swift-6-orange)](#)
+
 A native macOS **menubar time tracker** in the spirit of Clockify's desktop app — with a
 twist: it can **auto-track your time based on screen unlock/lock**, but only inside the
 **time windows you define** (certain weekdays, certain hours).
@@ -80,6 +85,33 @@ Sources/Clockapp/
 (DistributedNotificationCenter) and `NSWorkspace` sleep/wake. Every second, `AppState`
 re-evaluates the schedule: *inside a window + unlocked + auto on* → start an `.auto` entry;
 otherwise stop any running `.auto` entry. Manual entries are never auto-stopped.
+
+## Releases & auto-update
+
+The app self-updates from **GitHub Releases**: it checks
+`releases/latest` on launch (and on demand in Settings → Updates), downloads the
+`.zip` asset, **verifies the codesign signature against the pinned "Clockapp Dev"
+certificate**, swaps the bundle and relaunches. A foreign or tampered binary is
+rejected — installs fail closed.
+
+Cutting a release:
+
+```bash
+./scripts/release.sh 0.2.0
+```
+
+This bumps the version, tags `v0.2.0` and pushes; the `Release` GitHub Action then
+builds, signs and attaches `Clockapp-0.2.0.zip` (for the updater) and
+`Clockapp-0.2.0.dmg` (for humans) to the release.
+
+CI signing requires two repository secrets (Settings → Secrets → Actions):
+- `SIGNING_CERT_P12` — base64 of the "Clockapp Dev" identity exported as PKCS#12
+- `SIGNING_CERT_PASSWORD` — the p12 passphrase
+
+⚠️ Keep the "Clockapp Dev" certificate safe: the updater on every installed copy
+only accepts binaries signed by it. If it is ever lost/regenerated, update the
+pinned hash in `UpdaterService.swift` and in `release.yml`, and users must
+reinstall once manually.
 
 ## Notes / limits
 

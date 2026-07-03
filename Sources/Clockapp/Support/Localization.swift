@@ -48,6 +48,9 @@ enum LocKey {
     // Schedule editor
     case trackableWindows, add, scheduleHelp, noWindows, windowEditorTitle
     case name, days, startLabel, endLabel, cancel, defaultWindowName
+    // Updates
+    case sectionUpdates, currentVersionFmt, checkUpdates, updChecking, updUpToDate
+    case updAvailableFmt, updInstall, updInstalling, updFailedFmt
     // Weekdays (short)
     case wdMon, wdTue, wdWed, wdThu, wdFri, wdSat, wdSun
     // Nudge
@@ -156,6 +159,16 @@ enum Localization {
         .endLabel: T(fr: "Fin", en: "End", pt: "Fim", it: "Fine", tn: "النهاية"),
         .cancel: T(fr: "Annuler", en: "Cancel", pt: "Cancelar", it: "Annulla", tn: "بطّل"),
         .defaultWindowName: T(fr: "Nouvelle plage", en: "New window", pt: "Nova janela", it: "Nuova fascia", tn: "فترة جديدة"),
+
+        .sectionUpdates: T(fr: "Mises à jour", en: "Updates", pt: "Atualizações", it: "Aggiornamenti", tn: "التحديثات"),
+        .currentVersionFmt: T(fr: "Version actuelle : %@", en: "Current version: %@", pt: "Versão atual: %@", it: "Versione attuale: %@", tn: "النسخة الحالية: %@"),
+        .checkUpdates: T(fr: "Vérifier les mises à jour", en: "Check for updates", pt: "Verificar atualizações", it: "Controlla aggiornamenti", tn: "شوف كان فما تحديث"),
+        .updChecking: T(fr: "Vérification…", en: "Checking…", pt: "Verificando…", it: "Controllo…", tn: "قاعد يشوف…"),
+        .updUpToDate: T(fr: "À jour.", en: "Up to date.", pt: "Atualizado.", it: "Aggiornato.", tn: "آخر نسخة عندك."),
+        .updAvailableFmt: T(fr: "Version %@ disponible", en: "Version %@ available", pt: "Versão %@ disponível", it: "Versione %@ disponibile", tn: "النسخة %@ موجودة"),
+        .updInstall: T(fr: "Installer et relancer", en: "Install and relaunch", pt: "Instalar e reiniciar", it: "Installa e riavvia", tn: "ركّبها وأعاود شغّل"),
+        .updInstalling: T(fr: "Installation…", en: "Installing…", pt: "Instalando…", it: "Installazione…", tn: "قاعد يركّب…"),
+        .updFailedFmt: T(fr: "Échec : %@", en: "Failed: %@", pt: "Falhou: %@", it: "Errore: %@", tn: "ما مشاتش: %@"),
 
         .wdMon: T(fr: "Lun", en: "Mon", pt: "Seg", it: "Lun", tn: "تنين"),
         .wdTue: T(fr: "Mar", en: "Tue", pt: "Ter", it: "Mar", tn: "ثلاث"),
