@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 
 APP_NAME="Clockapp"
 BUNDLE_ID="com.jules.clockapp"
-VERSION="0.1.1"
+VERSION="0.1.2"
 CONFIG="${1:-release}"
 
 echo "▸ Building ($CONFIG)…"
