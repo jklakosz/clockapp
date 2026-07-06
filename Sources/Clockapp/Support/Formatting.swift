@@ -26,4 +26,25 @@ enum Format {
     static func hoursMinutes(_ interval: TimeInterval) -> String {
         hoursMinutes(Int(interval) / 60)
     }
+
+    private static let moneyFormatter: NumberFormatter = {
+        let f = NumberFormatter()
+        f.numberStyle = .decimal
+        f.groupingSeparator = " "
+        f.maximumFractionDigits = 0
+        return f
+    }()
+
+    /// "1 234 €" or "$1 234" — grouped, no decimals, symbol per currency convention.
+    static func money(_ amount: Double, _ currency: Currency) -> String {
+        let n = moneyFormatter.string(from: NSNumber(value: amount)) ?? "0"
+        return currency.symbolBefore ? "\(currency.symbol)\(n)" : "\(n) \(currency.symbol)"
+    }
+
+    /// "1 234 € (~1 409 $)" — primary amount plus its converted equivalent when known.
+    static func money(_ amount: Double, _ currency: Currency, converted: Double?) -> String {
+        let primary = money(amount, currency)
+        guard let converted else { return primary }
+        return "\(primary) (~\(money(converted, currency.other)))"
+    }
 }

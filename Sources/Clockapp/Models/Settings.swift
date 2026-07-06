@@ -58,3 +58,37 @@ struct Goals: Codable, Equatable {
     var weeklyMinutes: Int = 40 * 60
     var enabled: Bool = false
 }
+
+enum Currency: String, Codable, CaseIterable, Identifiable {
+    case eur, usd
+    var id: String { rawValue }
+    var symbol: String { self == .eur ? "€" : "$" }
+    /// € goes after the amount, $ before (fr vs us convention).
+    var symbolBefore: Bool { self == .usd }
+    var displayName: String { self == .eur ? "Euro (€)" : "Dollar US ($)" }
+}
+
+/// Earnings estimation from tracked time, with optional URSSAF (French social
+/// contributions) deduction. Rates are configurable; the BNC micro-entrepreneur
+/// rate is 26.1% in 2026.
+struct Earnings: Codable, Equatable {
+    var enabled: Bool = false
+    var hourlyRate: Double = 0
+    var currency: Currency = .eur
+    var urssafEnabled: Bool = false
+    var urssafRatePercent: Double = 26.1
+
+    /// Gross amount for a given tracked duration.
+    func gross(for seconds: TimeInterval) -> Double {
+        (seconds / 3600.0) * hourlyRate
+    }
+
+    func urssaf(for seconds: TimeInterval) -> Double {
+        urssafEnabled ? gross(for: seconds) * urssafRatePercent / 100.0 : 0
+    }
+
+    /// Net = gross minus the URSSAF contribution.
+    func net(for seconds: TimeInterval) -> Double {
+        gross(for: seconds) - urssaf(for: seconds)
+    }
+}

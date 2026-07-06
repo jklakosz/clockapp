@@ -48,6 +48,10 @@ enum LocKey {
     // Schedule editor
     case trackableWindows, add, scheduleHelp, noWindows, windowEditorTitle
     case name, days, startLabel, endLabel, cancel, defaultWindowName
+    // Earnings
+    case tabEarnings, sectionEarnings, enableEarnings, hourlyRate, currency
+    case sectionUrssaf, urssafDeduct, urssafRate, urssafHelp
+    case earnedThisMonth, gross, net, urssafLabel
     // Updates
     case sectionUpdates, currentVersionFmt, checkUpdates, updChecking, updUpToDate
     case updAvailableFmt, updInstall, updInstalling, updFailedFmt
@@ -159,6 +163,20 @@ enum Localization {
         .endLabel: T(fr: "Fin", en: "End", pt: "Fim", it: "Fine", tn: "النهاية"),
         .cancel: T(fr: "Annuler", en: "Cancel", pt: "Cancelar", it: "Annulla", tn: "بطّل"),
         .defaultWindowName: T(fr: "Nouvelle plage", en: "New window", pt: "Nova janela", it: "Nuova fascia", tn: "فترة جديدة"),
+
+        .tabEarnings: T(fr: "Rémunération", en: "Earnings", pt: "Ganhos", it: "Compensi", tn: "الفلوس"),
+        .sectionEarnings: T(fr: "Revenus estimés", en: "Estimated earnings", pt: "Ganhos estimados", it: "Compensi stimati", tn: "الفلوس المقدّرة"),
+        .enableEarnings: T(fr: "Activer le calcul des revenus", en: "Enable earnings calculation", pt: "Ativar cálculo de ganhos", it: "Attiva il calcolo dei compensi", tn: "فعّل حساب الفلوس"),
+        .hourlyRate: T(fr: "Taux horaire", en: "Hourly rate", pt: "Valor por hora", it: "Tariffa oraria", tn: "التعريفة في الساعة"),
+        .currency: T(fr: "Devise", en: "Currency", pt: "Moeda", it: "Valuta", tn: "العملة"),
+        .sectionUrssaf: T(fr: "Cotisations (URSSAF)", en: "Contributions (URSSAF)", pt: "Contribuições (URSSAF)", it: "Contributi (URSSAF)", tn: "المساهمات (URSSAF)"),
+        .urssafDeduct: T(fr: "Déduire les cotisations", en: "Deduct contributions", pt: "Deduzir contribuições", it: "Detrai i contributi", tn: "نقّص المساهمات"),
+        .urssafRate: T(fr: "Taux de cotisation (%)", en: "Contribution rate (%)", pt: "Taxa de contribuição (%)", it: "Aliquota contributiva (%)", tn: "نسبة المساهمة (%)"),
+        .urssafHelp: T(fr: "Micro-entrepreneur BNC : 26,1 % en 2026.", en: "BNC micro-entrepreneur: 26.1% in 2026.", pt: "Micro-empresário BNC: 26,1% em 2026.", it: "Micro-imprenditore BNC: 26,1% nel 2026.", tn: "ميكرو-أونتروبرونور BNC: 26.1% في 2026."),
+        .earnedThisMonth: T(fr: "Gagné ce mois", en: "Earned this month", pt: "Ganho este mês", it: "Guadagnato questo mese", tn: "الفلوس هالشهر"),
+        .gross: T(fr: "brut", en: "gross", pt: "bruto", it: "lordo", tn: "خام"),
+        .net: T(fr: "net", en: "net", pt: "líquido", it: "netto", tn: "صافي"),
+        .urssafLabel: T(fr: "URSSAF", en: "URSSAF", pt: "URSSAF", it: "URSSAF", tn: "URSSAF"),
 
         .sectionUpdates: T(fr: "Mises à jour", en: "Updates", pt: "Atualizações", it: "Aggiornamenti", tn: "التحديثات"),
         .currentVersionFmt: T(fr: "Version actuelle : %@", en: "Current version: %@", pt: "Versão atual: %@", it: "Versione attuale: %@", tn: "النسخة الحالية: %@"),

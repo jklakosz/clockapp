@@ -8,6 +8,7 @@ struct SettingsView: View {
             ClockifyTab().tabItem { Label(state.t(.tabClockify), systemImage: "cloud") }
             ScheduleEditorView().tabItem { Label(state.t(.tabSchedule), systemImage: "calendar") }
             GoalsTab().tabItem { Label(state.t(.tabGoals), systemImage: "target") }
+            EarningsTab().tabItem { Label(state.t(.tabEarnings), systemImage: "eurosign.circle") }
         }
         .padding(20)
     }
@@ -142,6 +143,77 @@ private struct ClockifyTab: View {
         case .disconnected:
             Label(state.t(.notConnected), systemImage: "circle").foregroundStyle(.secondary)
         }
+    }
+}
+
+// MARK: - Earnings tab
+
+private struct EarningsTab: View {
+    @EnvironmentObject private var state: AppState
+
+    private var e: Binding<Earnings> {
+        Binding(get: { state.earnings }, set: {
+            let currencyChanged = $0.currency != state.earnings.currency
+            state.earnings = $0
+            state.save()
+            if currencyChanged { state.refreshExchangeRate() }
+        })
+    }
+
+    var body: some View {
+        Form {
+            Section(state.t(.sectionEarnings)) {
+                Toggle(state.t(.enableEarnings), isOn: e.enabled)
+
+                HStack {
+                    Text(state.t(.hourlyRate))
+                    Spacer()
+                    TextField("", value: e.hourlyRate, format: .number)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 80)
+                    Text(state.earnings.currency.symbol).foregroundStyle(.secondary)
+                }
+
+                Picker(state.t(.currency), selection: e.currency) {
+                    ForEach(Currency.allCases) { c in
+                        Text(c.displayName).tag(c)
+                    }
+                }
+            }
+
+            Section(state.t(.sectionUrssaf)) {
+                Toggle(state.t(.urssafDeduct), isOn: e.urssafEnabled)
+                HStack {
+                    Text(state.t(.urssafRate))
+                    Spacer()
+                    TextField("", value: e.urssafRatePercent, format: .number)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 70)
+                        .disabled(!state.earnings.urssafEnabled)
+                    Text("%").foregroundStyle(.secondary)
+                }
+                Text(state.t(.urssafHelp))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
+            if state.earnings.enabled && state.earnings.hourlyRate > 0 {
+                Section(state.t(.earnedThisMonth)) {
+                    LabeledContent(state.t(.gross).capitalized,
+                                   value: Format.money(state.monthGross, state.earnings.currency,
+                                                       converted: state.converted(state.monthGross)))
+                    if state.earnings.urssafEnabled {
+                        LabeledContent("− \(state.t(.urssafLabel))",
+                                       value: Format.money(state.monthUrssaf, state.earnings.currency))
+                            .foregroundStyle(.secondary)
+                        LabeledContent(state.t(.net).capitalized,
+                                       value: Format.money(state.monthNet, state.earnings.currency,
+                                                           converted: state.converted(state.monthNet)))
+                            .fontWeight(.semibold)
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
     }
 }
 

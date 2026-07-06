@@ -17,6 +17,7 @@ final class AppState: ObservableObject {
     /// Entries for the current week fetched from Clockify — the source of truth for totals.
     @Published var remoteEntries: [TimeEntry] = []
     @Published var goals = Goals()
+    @Published var earnings = Earnings()
     @Published var settings = AppSettings()
 
     // Runtime status
@@ -54,6 +55,7 @@ final class AppState: ObservableObject {
     private var lastTrackerPoll: Date?
     /// Poll cadence for mirroring the running tracker from Clockify.
     private let trackerPollInterval: TimeInterval = 30
+    private var lastFxRefresh: Date?
     private let maxRecentEntries = 500
     /// Tracks window membership across ticks so we can act on *transitions* (edges)
     /// rather than the continuous "we're inside a window" condition — which would
@@ -66,6 +68,7 @@ final class AppState: ObservableObject {
         let state = store.load()
         settings = state.settings
         goals = state.goals
+        earnings = state.earnings
         windows = state.windows
         projects = state.projects
         recentEntries = state.recentEntries
@@ -96,6 +99,8 @@ final class AppState: ObservableObject {
             try? await Task.sleep(nanoseconds: 5_000_000_000)
             checkForUpdates(silent: true)
         }
+
+        refreshExchangeRate()
     }
 
     // MARK: - Persistence
@@ -104,6 +109,7 @@ final class AppState: ObservableObject {
         var s = PersistedState()
         s.settings = settings
         s.goals = goals
+        s.earnings = earnings
         s.windows = windows
         s.projects = projects
         s.recentEntries = Array(recentEntries.prefix(maxRecentEntries))
@@ -136,6 +142,10 @@ final class AppState: ObservableObject {
            lastTrackerPoll.map({ now.timeIntervalSince($0) > trackerPollInterval }) ?? true {
             lastTrackerPoll = now
             Task { await syncRunningEntryFromRemote() }
+        }
+        // Refresh the FX rate every 2 hours.
+        if let last = lastFxRefresh, now.timeIntervalSince(last) > 2 * 3600 {
+            refreshExchangeRate()
         }
     }
 
@@ -536,6 +546,29 @@ final class AppState: ObservableObject {
 
     var monthTotal: TimeInterval {
         StatsService.monthTotal(for: statsEntries, containing: now, asOf: now)
+    }
+
+    // Earnings for the current month, from tracked time.
+    var monthGross: Double { earnings.gross(for: monthTotal) }
+    var monthUrssaf: Double { earnings.urssaf(for: monthTotal) }
+    var monthNet: Double { earnings.net(for: monthTotal) }
+
+    /// Rate from the user's currency to the other one (for the dual display). Nil until fetched.
+    @Published var fxToOther: Double?
+
+    /// Converts an amount in the user's currency to the other currency, if the rate is known.
+    func converted(_ amount: Double) -> Double? {
+        fxToOther.map { amount * $0 }
+    }
+
+    func refreshExchangeRate() {
+        lastFxRefresh = now
+        let from = earnings.currency
+        let to = from.other
+        Task {
+            let rate = await ExchangeRateService.shared.rate(from: from, to: to)
+            if earnings.currency == from { fxToOther = rate }
+        }
     }
 
     func heatmap() -> [[TimeInterval]] {

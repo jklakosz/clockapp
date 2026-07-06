@@ -57,6 +57,7 @@ struct MenuContentView: View {
             Divider()
             totalsRow
             if state.goals.enabled { goalRow }
+            if state.earnings.enabled && state.earnings.hourlyRate > 0 { earningsRow }
             Divider()
             heatmapSection
         }
@@ -152,6 +153,26 @@ struct MenuContentView: View {
         return ProgressView(value: min(state.todayTotal, dayGoal), total: max(dayGoal, 1)) {
             Text(state.t(.dailyGoalFmt, Format.hoursMinutes(state.todayTotal), Format.hoursMinutes(state.goals.dailyMinutes)))
                 .font(.caption2)
+        }
+    }
+
+    private var earningsRow: some View {
+        let showNet = state.earnings.urssafEnabled
+        let amount = showNet ? state.monthNet : state.monthGross
+        let label = showNet ? state.t(.net) : state.t(.gross)
+        return HStack(spacing: 6) {
+            Image(systemName: "eurosign.circle").foregroundStyle(.secondary)
+            Text(state.t(.earnedThisMonth)).font(.caption).foregroundStyle(.secondary)
+            Spacer()
+            VStack(alignment: .trailing, spacing: 0) {
+                Text(Format.money(amount, state.earnings.currency))
+                    .font(.callout).monospacedDigit()
+                    + Text(" \(label)").font(.caption2).foregroundColor(.secondary)
+                if let conv = state.converted(amount) {
+                    Text("~\(Format.money(conv, state.earnings.currency.other))")
+                        .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                }
+            }
         }
     }
 
