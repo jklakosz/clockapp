@@ -1,48 +1,52 @@
 import Foundation
 import AppKit
 
-/// Bridges macOS screen-lock and sleep/wake events into simple callbacks.
-///
-/// - Lock  (`com.apple.screenIsLocked`) and Sleep (`NSWorkspace.willSleep`) → `onLockOrSleep`
-/// - Unlock (`com.apple.screenIsUnlocked`) and Wake (`NSWorkspace.didWake`)  → `onUnlockOrWake`
-///
-/// These are the signals used to auto start/stop tracking, gated by the schedule.
+/// A user-presence transition derived from system notifications.
+enum ScreenEvent {
+    case locked        // session locked
+    case unlocked      // session unlocked
+    case coverStarted  // screensaver started, displays slept, or system going to sleep
+    case coverEnded    // screensaver stopped, displays woke, or system woke
+}
+
+/// Bridges macOS lock/unlock, sleep/wake and screensaver notifications into
+/// `ScreenEvent`s. These drive auto start/stop of tracking, gated by the schedule.
 final class AutoTrackService {
-    private let onLockOrSleep: () -> Void
-    private let onUnlockOrWake: () -> Void
+    private let onEvent: (ScreenEvent) -> Void
     private var observers: [NSObjectProtocol] = []
 
-    init(onLockOrSleep: @escaping () -> Void,
-         onUnlockOrWake: @escaping () -> Void) {
-        self.onLockOrSleep = onLockOrSleep
-        self.onUnlockOrWake = onUnlockOrWake
+    init(onEvent: @escaping (ScreenEvent) -> Void) {
+        self.onEvent = onEvent
         subscribe()
     }
 
     private func subscribe() {
-        // Screen lock / unlock — undocumented but stable distributed notifications.
+        // Session lock/unlock — undocumented but stable distributed notifications.
         let dc = DistributedNotificationCenter.default()
-        observers.append(dc.addObserver(
-            forName: Notification.Name("com.apple.screenIsLocked"),
-            object: nil, queue: .main) { [weak self] _ in self?.onLockOrSleep() })
-        observers.append(dc.addObserver(
-            forName: Notification.Name("com.apple.screenIsUnlocked"),
-            object: nil, queue: .main) { [weak self] _ in self?.onUnlockOrWake() })
+        observe(dc, "com.apple.screenIsLocked", .locked)
+        observe(dc, "com.apple.screenIsUnlocked", .unlocked)
+        // Screensaver — the display stays on, so display-sleep events never fire.
+        observe(dc, "com.apple.screensaver.didstart", .coverStarted)
+        observe(dc, "com.apple.screensaver.didstop", .coverEnded)
 
         // Sleep / wake — documented workspace notifications.
         let wc = NSWorkspace.shared.notificationCenter
-        observers.append(wc.addObserver(
-            forName: NSWorkspace.willSleepNotification,
-            object: nil, queue: .main) { [weak self] _ in self?.onLockOrSleep() })
-        observers.append(wc.addObserver(
-            forName: NSWorkspace.didWakeNotification,
-            object: nil, queue: .main) { [weak self] _ in self?.onUnlockOrWake() })
-        observers.append(wc.addObserver(
-            forName: NSWorkspace.screensDidSleepNotification,
-            object: nil, queue: .main) { [weak self] _ in self?.onLockOrSleep() })
-        observers.append(wc.addObserver(
-            forName: NSWorkspace.screensDidWakeNotification,
-            object: nil, queue: .main) { [weak self] _ in self?.onUnlockOrWake() })
+        observe(wc, NSWorkspace.willSleepNotification, .coverStarted)
+        observe(wc, NSWorkspace.didWakeNotification, .coverEnded)
+        observe(wc, NSWorkspace.screensDidSleepNotification, .coverStarted)
+        observe(wc, NSWorkspace.screensDidWakeNotification, .coverEnded)
+    }
+
+    private func observe(_ center: NotificationCenter, _ name: NSNotification.Name, _ event: ScreenEvent) {
+        observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+            self?.onEvent(event)
+        })
+    }
+
+    private func observe(_ center: DistributedNotificationCenter, _ name: String, _ event: ScreenEvent) {
+        observers.append(center.addObserver(forName: Notification.Name(name), object: nil, queue: .main) { [weak self] _ in
+            self?.onEvent(event)
+        })
     }
 
     deinit {

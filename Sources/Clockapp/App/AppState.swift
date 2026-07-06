@@ -20,7 +20,10 @@ final class AppState: ObservableObject {
     @Published var settings = AppSettings()
 
     // Runtime status
+    /// Session locked (password wall). Driven only by lock/unlock notifications.
     @Published var isScreenLocked = false
+    /// Screen "covered": screensaver running, displays asleep, or system asleep.
+    @Published var isScreenCovered = false
     @Published var connection: Connection = .disconnected
     @Published var updateStatus: UpdateStatus = .idle
 
@@ -75,10 +78,9 @@ final class AppState: ObservableObject {
         clockify.workspaceId = settings.workspaceId
         clockify.userId = settings.userId
 
-        autoTrack = AutoTrackService(
-            onLockOrSleep: { [weak self] in self?.handleScreenLocked() },
-            onUnlockOrWake: { [weak self] in self?.handleScreenUnlocked() }
-        )
+        autoTrack = AutoTrackService { [weak self] event in
+            self?.handleScreenEvent(event)
+        }
 
         startTicker()
 
@@ -230,16 +232,25 @@ final class AppState: ObservableObject {
 
     // MARK: - Auto-track (screen lock/unlock gated by schedule)
 
-    private func handleScreenLocked() {
-        isScreenLocked = true
-        // Locking/sleeping stops an auto entry (edge).
-        if currentEntry?.source == .auto { stop() }
-    }
-
-    private func handleScreenUnlocked() {
-        isScreenLocked = false
-        // Unlocking/waking starts tracking (edge) — but only inside a window and if idle.
-        autoStartIfPossible()
+    private func handleScreenEvent(_ event: ScreenEvent) {
+        switch event {
+        case .locked:
+            isScreenLocked = true
+            if currentEntry?.source == .auto { stop() }
+        case .coverStarted:
+            // Screensaver / display sleep / system sleep — user is away, stop (edge).
+            isScreenCovered = true
+            if currentEntry?.source == .auto { stop() }
+        case .unlocked:
+            isScreenLocked = false
+            isScreenCovered = false
+            autoStartIfPossible()
+        case .coverEnded:
+            // Display woke or screensaver dismissed. If the session is locked, wait
+            // for the unlock event; otherwise resume (edge).
+            isScreenCovered = false
+            autoStartIfPossible()
+        }
     }
 
     /// Runs every tick. Only acts on window *transitions* (edges), never on the mere
@@ -261,11 +272,12 @@ final class AppState: ObservableObject {
         wasInWindow = inWindow
     }
 
-    /// Starts an `.auto` entry iff auto-track is on, screen unlocked, we're inside a
-    /// window, and nothing is already running. Called on genuine edges only.
+    /// Starts an `.auto` entry iff auto-track is on, the user is present (unlocked and
+    /// screen not covered), we're inside a window, and nothing is already running.
+    /// Called on genuine edges only.
     private func autoStartIfPossible() {
-        guard settings.autoTrackEnabled, !isScreenLocked, currentEntry == nil,
-              let w = activeWindow(at: now) else { return }
+        guard settings.autoTrackEnabled, !isScreenLocked, !isScreenCovered,
+              currentEntry == nil, let w = activeWindow(at: now) else { return }
         start(projectId: w.projectId, source: .auto, description: w.name)
     }
 
