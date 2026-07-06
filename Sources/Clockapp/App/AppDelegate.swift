@@ -87,6 +87,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             button.action = #selector(togglePopover(_:))
             button.target = self
             button.imagePosition = .imageLeading
+            // Fixed-width digits so the ticking time doesn't jiggle the menubar item.
+            button.font = NSFont.monospacedDigitSystemFont(
+                ofSize: NSFont.systemFontSize(for: .regular), weight: .regular)
         }
         updateStatusButton()
     }
