@@ -46,7 +46,9 @@ struct MultilineDescriptionField: NSViewRepresentable {
         guard let textView = nsView.documentView as? SubmittingTextView else { return }
         context.coordinator.onCommit = onCommit
         textView.onCommit = { context.coordinator.onCommit() }
-        if textView.string != text {
+        // Never overwrite while the user is typing (view is first responder) —
+        // remote-sync updates only land when the field isn't focused.
+        if textView.string != text, textView.window?.firstResponder !== textView {
             textView.string = text
             textView.needsDisplay = true
         }

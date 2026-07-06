@@ -130,6 +130,23 @@ final class ClockifyClient {
         return all
     }
 
+    /// The user's currently running entry on Clockify, if any (end is nil).
+    func fetchRunningEntry() async throws -> TimeEntry? {
+        let path = "/workspaces/\(workspaceId)/user/\(userId)/time-entries?in-progress=true&page-size=1"
+        let batch: [TimeEntryDTO] = try await request(path, method: "GET")
+        guard let dto = batch.first,
+              let start = Self.parseDate(dto.timeInterval.start) else { return nil }
+        return TimeEntry(
+            id: dto.id,
+            start: start,
+            end: nil,
+            description: dto.description ?? "",
+            projectId: dto.projectId,
+            billable: dto.billable ?? false,
+            source: .manual,
+            syncState: .synced)
+    }
+
     /// Returns the project id of the user's most recent time entry (any date).
     /// Clockify returns entries most-recent-first, so we take the first one carrying a project.
     func fetchMostRecentProjectId() async throws -> String? {

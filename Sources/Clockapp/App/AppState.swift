@@ -48,6 +48,9 @@ final class AppState: ObservableObject {
     private var ticker: Timer?
     private var lastNudgeMinute: Int = -1
     private var lastTotalsRefresh: Date?
+    private var lastTrackerPoll: Date?
+    /// Poll cadence for mirroring the running tracker from Clockify.
+    private let trackerPollInterval: TimeInterval = 30
     private let maxRecentEntries = 500
     /// Tracks window membership across ticks so we can act on *transitions* (edges)
     /// rather than the continuous "we're inside a window" condition — which would
@@ -125,6 +128,12 @@ final class AppState: ObservableObject {
         // Periodically re-pull totals from Clockify (catches edits from other devices).
         if let last = lastTotalsRefresh, now.timeIntervalSince(last) > 300 {
             Task { await refreshTotals() }
+        }
+        // Mirror the running tracker from Clockify (start/stop/edits made over there).
+        if clockify.isConfigured,
+           lastTrackerPoll.map({ now.timeIntervalSince($0) > trackerPollInterval }) ?? true {
+            lastTrackerPoll = now
+            Task { await syncRunningEntryFromRemote() }
         }
     }
 
@@ -369,7 +378,55 @@ final class AppState: ObservableObject {
 
     /// Called by AppDelegate when the menubar panel opens, for fresh numbers.
     func onPanelOpened() {
-        Task { await refreshTotals() }
+        Task {
+            await refreshTotals()
+            await syncRunningEntryFromRemote()
+        }
+    }
+
+    /// Reconciles the local timer with the entry actually running on Clockify, so
+    /// starts/stops/edits made from the Clockify UI (or another device) show up here.
+    func syncRunningEntryFromRemote() async {
+        guard clockify.isConfigured, !settings.workspaceId.isEmpty, !settings.userId.isEmpty else { return }
+        let remote: TimeEntry?
+        do { remote = try await clockify.fetchRunningEntry() } catch { return }
+
+        switch (currentEntry, remote) {
+        case (nil, nil):
+            break
+
+        case (nil, .some(let r)):
+            // Started from Clockify — adopt it. Skip if it's an entry we just stopped
+            // locally (our stop push may still be in flight).
+            guard !recentEntries.contains(where: { $0.id == r.id }) else { break }
+            currentEntry = r
+
+        case (.some(let local), nil):
+            // Stopped from Clockify — finalize locally WITHOUT pushing a stop.
+            // (If our entry never reached Clockify, remote nil says nothing — keep it.)
+            guard local.syncState == .synced else { break }
+            await refreshTotals(force: true)
+            var finished = local
+            finished.end = remoteEntries.first(where: { $0.id == local.id })?.end ?? Date()
+            finished.syncState = .synced
+            currentEntry = nil
+            recentEntries.insert(finished, at: 0)
+            recentEntries = Array(recentEntries.prefix(maxRecentEntries))
+            save()
+
+        case (.some(let local), .some(let r)):
+            if local.id == r.id {
+                // Same entry: mirror remote edits (description, project, start).
+                var merged = local
+                merged.description = r.description
+                merged.projectId = r.projectId
+                merged.start = r.start
+                if merged != local { currentEntry = merged }
+            } else {
+                // A different entry is running on Clockify — Clockify wins.
+                currentEntry = r
+            }
+        }
     }
 
     // MARK: - Derived stats
@@ -497,22 +554,24 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// Edits an existing entry's times/description (optimistic locally, then Clockify).
-    func updateEntry(_ entry: TimeEntry, start: Date, end: Date?, description: String) {
+    /// Edits an existing entry's times/description/project (optimistic locally, then Clockify).
+    func updateEntry(_ entry: TimeEntry, start: Date, end: Date?, description: String, projectId: String?) {
         if let i = remoteEntries.firstIndex(where: { $0.id == entry.id }) {
             remoteEntries[i].start = start
             remoteEntries[i].end = end
             remoteEntries[i].description = description
+            remoteEntries[i].projectId = projectId
         }
         if currentEntry?.id == entry.id {
             currentEntry?.start = start
             currentEntry?.description = description
+            currentEntry?.projectId = projectId
         }
         guard clockify.isConfigured else { return }
         Task {
             do {
                 try await clockify.updateEntry(id: entry.id, description: description,
-                    projectId: entry.projectId, billable: entry.billable, start: start, end: end)
+                    projectId: projectId, billable: entry.billable, start: start, end: end)
                 await refreshTotals(force: true)
             } catch { /* keep optimistic copy */ }
         }

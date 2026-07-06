@@ -36,6 +36,11 @@ struct MenuContentView: View {
         .onChange(of: state.currentEntry?.id) { _ in
             draftDescription = state.currentEntry?.description ?? ""
         }
+        // Mirror description edits coming from Clockify. The field itself refuses the
+        // overwrite while focused, so typing in progress is never clobbered.
+        .onChange(of: state.currentEntry?.description) { desc in
+            if let desc { draftDescription = desc }
+        }
         .onDisappear {
             if state.isTracking { state.updateCurrentDescription(draftDescription) }
         }

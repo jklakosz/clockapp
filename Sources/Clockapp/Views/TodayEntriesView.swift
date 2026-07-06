@@ -27,8 +27,8 @@ struct TodayEntriesView: View {
                                 entry: entry,
                                 project: state.project(for: entry.projectId),
                                 isRunning: entry.id == state.currentEntry?.id,
-                                onSave: { start, end, desc in
-                                    state.updateEntry(entry, start: start, end: end, description: desc)
+                                onSave: { start, end, desc, pid in
+                                    state.updateEntry(entry, start: start, end: end, description: desc, projectId: pid)
                                 },
                                 onDelete: { state.deleteEntry(entry) }
                             )
@@ -46,13 +46,14 @@ private struct EntryRow: View {
     let entry: TimeEntry
     let project: Project?
     let isRunning: Bool
-    let onSave: (Date, Date?, String) -> Void
+    let onSave: (Date, Date?, String, String?) -> Void
     let onDelete: () -> Void
 
     @State private var expanded = false
     @State private var editStart = Date()
     @State private var editEnd = Date()
     @State private var editDesc = ""
+    @State private var editProjectId: String?
 
     private static let hhmm: DateFormatter = {
         let f = DateFormatter(); f.dateFormat = "HH:mm"; return f
@@ -101,6 +102,8 @@ private struct EntryRow: View {
         VStack(alignment: .leading, spacing: 8) {
             TextField(state.t(.description), text: $editDesc)
                 .textFieldStyle(.roundedBorder)
+            ProjectPicker(projects: state.projects, selection: $editProjectId,
+                          label: state.t(.project))
             HStack(spacing: 8) {
                 TimeField(date: $editStart)
                 Text("→").foregroundStyle(.secondary)
@@ -119,7 +122,7 @@ private struct EntryRow: View {
                 Button(state.t(.save)) {
                     let newStart = combine(day: entry.start, time: editStart)
                     let newEnd: Date? = isRunning ? nil : combine(day: entry.end ?? entry.start, time: editEnd)
-                    onSave(newStart, newEnd, editDesc)
+                    onSave(newStart, newEnd, editDesc, editProjectId)
                     expanded = false
                 }
                 .keyboardShortcut(.defaultAction)
@@ -132,6 +135,7 @@ private struct EntryRow: View {
             editStart = entry.start
             editEnd = entry.end ?? Date()
             editDesc = entry.description
+            editProjectId = entry.projectId
         }
         withAnimation(.easeInOut(duration: 0.12)) { expanded.toggle() }
     }
