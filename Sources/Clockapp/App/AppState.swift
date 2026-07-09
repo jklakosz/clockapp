@@ -622,6 +622,44 @@ final class AppState: ObservableObject {
         }
     }
 
+    // MARK: - Smart merge
+
+    /// Chains of today's entries that Smart merge would collapse (>= 2 each).
+    func smartMergeGroups() -> [[TimeEntry]] {
+        MergeService.plan(todayEntries)
+    }
+
+    /// Applies a merge plan: extends the first entry of each chain and deletes the rest,
+    /// both locally (optimistic) and on Clockify.
+    func applySmartMerge(_ groups: [[TimeEntry]]) {
+        guard clockify.isConfigured, !groups.isEmpty else { return }
+        var merges: [TimeEntry] = []
+        var deleteIds: [String] = []
+
+        for chain in groups {
+            let merged = MergeService.merged(from: chain)
+            merges.append(merged)
+            deleteIds.append(contentsOf: chain.dropFirst().map { $0.id })
+            if let i = remoteEntries.firstIndex(where: { $0.id == merged.id }) {
+                remoteEntries[i] = merged
+            }
+        }
+        let delSet = Set(deleteIds)
+        remoteEntries.removeAll { delSet.contains($0.id) }
+        save()
+
+        Task {
+            for m in merges {
+                try? await clockify.updateEntry(id: m.id, description: m.description,
+                    projectId: m.projectId, billable: m.billable, start: m.start, end: m.end)
+            }
+            for id in deleteIds {
+                try? await clockify.deleteEntry(id: id)
+            }
+            await refreshTotals(force: true)
+        }
+    }
+
     func deleteEntry(_ entry: TimeEntry) {
         if currentEntry?.id == entry.id { currentEntry = nil }
         remoteEntries.removeAll { $0.id == entry.id }

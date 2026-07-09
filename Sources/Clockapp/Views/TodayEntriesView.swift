@@ -4,6 +4,9 @@ import SwiftUI
 /// or delete. Backed by Clockify (optimistic local updates, then resync).
 struct TodayEntriesView: View {
     @EnvironmentObject private var state: AppState
+    @State private var mergeGroups: [[TimeEntry]] = []
+    @State private var showMergeConfirm = false
+    @State private var mergeMessage = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -12,6 +15,15 @@ struct TodayEntriesView: View {
                 Spacer()
                 Text(Format.hoursMinutes(state.todayTotal))
                     .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+            }
+
+            if state.todayEntries.count >= 2 {
+                Button { prepareMerge() } label: {
+                    Label(state.t(.smartMerge), systemImage: "arrow.triangle.merge")
+                        .font(.caption)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
             }
 
             if state.todayEntries.isEmpty {
@@ -38,6 +50,30 @@ struct TodayEntriesView: View {
                 .frame(maxHeight: 260)
             }
         }
+        .alert(state.t(.mergeTitle), isPresented: $showMergeConfirm) {
+            if mergeGroups.isEmpty {
+                Button("OK", role: .cancel) {}
+            } else {
+                Button(state.t(.cancel), role: .cancel) {}
+                Button(state.t(.smartMerge)) { state.applySmartMerge(mergeGroups) }
+            }
+        } message: {
+            Text(mergeMessage)
+        }
+    }
+
+    private func prepareMerge() {
+        let groups = state.smartMergeGroups()
+        let deleted = MergeService.deletedCount(groups)
+        if deleted == 0 {
+            mergeGroups = []
+            mergeMessage = state.t(.mergeNothing)
+        } else {
+            let before = state.todayEntries.filter { $0.end != nil }.count
+            mergeGroups = groups
+            mergeMessage = state.t(.mergeMsgFmt, before, before - deleted, deleted)
+        }
+        showMergeConfirm = true
     }
 }
 

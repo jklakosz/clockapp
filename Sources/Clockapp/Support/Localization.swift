@@ -36,6 +36,7 @@ enum LocKey {
     case connConnecting, connError, connOffline, settings, quit, settingsWindowTitle
     // Entries
     case noEntriesToday, noDescription, runningLc, delete, save, description
+    case smartMerge, mergeTitle, mergeMsgFmt, mergeNothing
     // Project picker
     case noProject, searchProject, noResult, noClient, defaultProject
     // Settings
@@ -120,6 +121,10 @@ enum Localization {
         .delete: T(fr: "Supprimer", en: "Delete", pt: "Excluir", it: "Elimina", tn: "افسخ"),
         .save: T(fr: "Enregistrer", en: "Save", pt: "Salvar", it: "Salva", tn: "سجّل"),
         .description: T(fr: "Description", en: "Description", pt: "Descrição", it: "Descrizione", tn: "وصف"),
+        .smartMerge: T(fr: "Fusion intelligente", en: "Smart merge", pt: "Mesclagem inteligente", it: "Unione intelligente", tn: "دمج ذكي"),
+        .mergeTitle: T(fr: "Fusionner les entrées ?", en: "Merge entries?", pt: "Mesclar entradas?", it: "Unire le voci?", tn: "تدمج الإدخالات؟"),
+        .mergeMsgFmt: T(fr: "%d entrées → %d entrées (%d supprimées sur Clockify)", en: "%d entries → %d entries (%d deleted on Clockify)", pt: "%d entradas → %d entradas (%d excluídas no Clockify)", it: "%d voci → %d voci (%d eliminate su Clockify)", tn: "%d إدخالات → %d إدخالات (%d تتفسخ من Clockify)"),
+        .mergeNothing: T(fr: "Rien à fusionner aujourd'hui.", en: "Nothing to merge today.", pt: "Nada para mesclar hoje.", it: "Niente da unire oggi.", tn: "ما فماش شنو تدمج اليوم."),
 
         .noProject: T(fr: "Sans projet", en: "No project", pt: "Sem projeto", it: "Nessun progetto", tn: "بلا مشروع"),
         .searchProject: T(fr: "Rechercher un projet…", en: "Search a project…", pt: "Buscar um projeto…", it: "Cerca un progetto…", tn: "لوّج على مشروع…"),
