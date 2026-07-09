@@ -55,6 +55,7 @@ enum LocKey {
     case earnedThisMonth, gross, net, urssafLabel
     // Updates
     case sectionUpdates, currentVersionFmt, checkUpdates, updChecking, updUpToDate
+    case receiveRC, receiveRCHelp
     case updAvailableFmt, updInstall, updInstalling, updFailedFmt
     // Weekdays (short)
     case wdMon, wdTue, wdWed, wdThu, wdFri, wdSat, wdSun
@@ -182,6 +183,9 @@ enum Localization {
         .gross: T(fr: "brut", en: "gross", pt: "bruto", it: "lordo", tn: "خام"),
         .net: T(fr: "net", en: "net", pt: "líquido", it: "netto", tn: "صافي"),
         .urssafLabel: T(fr: "URSSAF", en: "URSSAF", pt: "URSSAF", it: "URSSAF", tn: "URSSAF"),
+
+        .receiveRC: T(fr: "Recevoir les versions candidates (RC)", en: "Receive release candidates (RC)", pt: "Receber versões candidatas (RC)", it: "Ricevi release candidate (RC)", tn: "أستقبل النسخ التجريبية (RC)"),
+        .receiveRCHelp: T(fr: "Propose aussi les pré-versions, avant leur sortie stable.", en: "Also offers pre-releases, before their stable release.", pt: "Também oferece pré-lançamentos, antes da versão estável.", it: "Propone anche le pre-release, prima della versione stabile.", tn: "يقترح زادة النسخ قبل ما تخرج الرسمية."),
 
         .sectionUpdates: T(fr: "Mises à jour", en: "Updates", pt: "Atualizações", it: "Aggiornamenti", tn: "التحديثات"),
         .currentVersionFmt: T(fr: "Version actuelle : %@", en: "Current version: %@", pt: "Versão atual: %@", it: "Versione attuale: %@", tn: "النسخة الحالية: %@"),

@@ -27,21 +27,38 @@ enum UpdaterService {
 
     // MARK: - Check
 
-    /// Returns the latest release if it is strictly newer than the running version.
-    static func checkForUpdate() async throws -> Release? {
+    /// Returns the newest applicable release if it is strictly newer than the running
+    /// version. With `allowPrereleases`, release candidates are considered too;
+    /// otherwise only stable releases (GitHub's `releases/latest` excludes prereleases).
+    static func checkForUpdate(allowPrereleases: Bool) async throws -> Release? {
         guard let current = currentVersion else { return nil }
+        let best = try await (allowPrereleases ? newestPrerelease() : latestStable())
+        return makeRelease(best, newerThan: current)
+    }
+
+    private static func latestStable() async throws -> ReleaseDTO? {
         let url = URL(string: "https://api.github.com/repos/\(owner)/\(repo)/releases/latest")!
-        var req = URLRequest(url: url)
-        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-
-        let (data, response) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await get(url)
         guard let http = response as? HTTPURLResponse else { throw UpdateError.network }
-        if http.statusCode == 404 { return nil } // no release published yet
+        if http.statusCode == 404 { return nil } // no stable release yet
         guard http.statusCode == 200 else { throw UpdateError.network }
+        return try JSONDecoder().decode(ReleaseDTO.self, from: data)
+    }
 
-        let dto = try JSONDecoder().decode(ReleaseDTO.self, from: data)
-        let version = dto.tagName.hasPrefix("v") ? String(dto.tagName.dropFirst()) : dto.tagName
-        guard isVersion(version, newerThan: current),
+    /// Highest-versioned non-draft release across the recent list (prereleases included).
+    private static func newestPrerelease() async throws -> ReleaseDTO? {
+        let url = URL(string: "https://api.github.com/repos/\(owner)/\(repo)/releases?per_page=30")!
+        let (data, response) = try await get(url)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { throw UpdateError.network }
+        let all = try JSONDecoder().decode([ReleaseDTO].self, from: data)
+        return all.filter { !$0.draft }
+            .max { SemVer(cleanTag($0.tagName)) < SemVer(cleanTag($1.tagName)) }
+    }
+
+    private static func makeRelease(_ dto: ReleaseDTO?, newerThan current: String) -> Release? {
+        guard let dto else { return nil }
+        let version = cleanTag(dto.tagName)
+        guard SemVer(version) > SemVer(current),
               let asset = dto.assets.first(where: { $0.name.hasSuffix(".zip") }),
               let zipURL = URL(string: asset.browserDownloadUrl) else {
             return nil
@@ -49,16 +66,14 @@ enum UpdaterService {
         return Release(version: version, zipURL: zipURL)
     }
 
-    /// Numeric dot-component comparison ("0.10.0" > "0.9.1").
-    static func isVersion(_ a: String, newerThan b: String) -> Bool {
-        let av = a.split(separator: ".").map { Int($0) ?? 0 }
-        let bv = b.split(separator: ".").map { Int($0) ?? 0 }
-        for i in 0..<max(av.count, bv.count) {
-            let x = i < av.count ? av[i] : 0
-            let y = i < bv.count ? bv[i] : 0
-            if x != y { return x > y }
-        }
-        return false
+    private static func cleanTag(_ tag: String) -> String {
+        tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
+    }
+
+    private static func get(_ url: URL) async throws -> (Data, URLResponse) {
+        var req = URLRequest(url: url)
+        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        return try await URLSession.shared.data(for: req)
     }
 
     // MARK: - Install
@@ -136,6 +151,8 @@ enum UpdaterService {
     private struct ReleaseDTO: Decodable {
         let tagName: String
         let assets: [Asset]
+        let draft: Bool
+        let prerelease: Bool
         struct Asset: Decodable {
             let name: String
             let browserDownloadUrl: String
@@ -146,8 +163,47 @@ enum UpdaterService {
         }
         enum CodingKeys: String, CodingKey {
             case tagName = "tag_name"
-            case assets
+            case assets, draft, prerelease
         }
+    }
+}
+
+/// Minimal semantic-version compare: numeric core plus optional prerelease suffix
+/// ("0.4.0-rc.2"). A stable version outranks its prereleases (0.4.0 > 0.4.0-rc.2),
+/// and prereleases order by their identifiers (rc.1 < rc.2 < rc.10).
+struct SemVer: Comparable {
+    let core: [Int]
+    let pre: [String]
+
+    init(_ raw: String) {
+        var s = raw
+        if s.hasPrefix("v") { s.removeFirst() }
+        let parts = s.split(separator: "-", maxSplits: 1)
+        core = (parts.first.map(String.init) ?? "0").split(separator: ".").map { Int($0) ?? 0 }
+        pre = parts.count > 1 ? parts[1].split(separator: ".").map(String.init) : []
+    }
+
+    static func < (a: SemVer, b: SemVer) -> Bool {
+        for i in 0..<max(a.core.count, b.core.count) {
+            let x = i < a.core.count ? a.core[i] : 0
+            let y = i < b.core.count ? b.core[i] : 0
+            if x != y { return x < y }
+        }
+        // Cores equal: a stable version (no prerelease) is greater than any prerelease.
+        if a.pre.isEmpty || b.pre.isEmpty { return !a.pre.isEmpty && b.pre.isEmpty }
+        for i in 0..<max(a.pre.count, b.pre.count) {
+            if i >= a.pre.count { return true }   // shorter prerelease list ranks lower
+            if i >= b.pre.count { return false }
+            let ai = a.pre[i], bi = b.pre[i]
+            if ai == bi { continue }
+            if let an = Int(ai), let bn = Int(bi) { return an < bn }
+            return ai < bi
+        }
+        return false
+    }
+
+    static func == (a: SemVer, b: SemVer) -> Bool {
+        a.core == b.core && a.pre == b.pre
     }
 }
 

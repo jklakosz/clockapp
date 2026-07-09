@@ -52,8 +52,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # A hyphen in the tag (e.g. v0.4.0-rc.1) marks a pre-release / RC.
+          PRERELEASE=""
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then PRERELEASE="--prerelease"; fi
           gh release create "$GITHUB_REF_NAME" \
             "dist/Clockapp-$VERSION.zip" \
             "dist/Clockapp-$VERSION.dmg" \
             --title "Clockapp $VERSION" \
-            --generate-notes
+            --generate-notes $PRERELEASE

@@ -91,6 +91,12 @@ private struct ClockifyTab: View {
                             .buttonStyle(.borderedProminent)
                     }
                 }
+                Toggle(state.t(.receiveRC), isOn: Binding(
+                    get: { state.settings.receivePrereleases },
+                    set: { state.settings.receivePrereleases = $0; state.save(); state.checkForUpdates(silent: true) }
+                ))
+                Text(state.t(.receiveRCHelp))
+                    .font(.caption).foregroundStyle(.secondary)
             }
 
             Section(state.t(.sectionLanguage)) {

@@ -12,6 +12,8 @@ struct AppSettings: Codable, Equatable {
     var useLastProjectAsDefault = false
     var lastUsedProjectId: String?
     var language: AppLanguage = .detected()
+    /// When true, the updater also offers pre-releases (release candidates).
+    var receivePrereleases = false
 
     init() {}
 
@@ -19,6 +21,7 @@ struct AppSettings: Codable, Equatable {
         case autoTrackEnabled, nudgesEnabled, showSecondsInMenuBar
         case workspaceId, userId, defaultProjectId
         case useLastProjectAsDefault, lastUsedProjectId, language
+        case receivePrereleases
     }
 
     // Tolerant decoding: any missing key (e.g. a field added in a later version) falls
@@ -34,6 +37,7 @@ struct AppSettings: Codable, Equatable {
         useLastProjectAsDefault = try c.decodeIfPresent(Bool.self, forKey: .useLastProjectAsDefault) ?? false
         lastUsedProjectId = try c.decodeIfPresent(String.self, forKey: .lastUsedProjectId)
         language = try c.decodeIfPresent(AppLanguage.self, forKey: .language) ?? .detected()
+        receivePrereleases = try c.decodeIfPresent(Bool.self, forKey: .receivePrereleases) ?? false
     }
 }
 

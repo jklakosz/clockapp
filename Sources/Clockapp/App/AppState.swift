@@ -469,7 +469,7 @@ final class AppState: ObservableObject {
         if !silent { updateStatus = .checking }
         Task {
             do {
-                if let release = try await UpdaterService.checkForUpdate() {
+                if let release = try await UpdaterService.checkForUpdate(allowPrereleases: settings.receivePrereleases) {
                     pendingRelease = release
                     updateStatus = .available(version: release.version)
                 } else if !silent {
