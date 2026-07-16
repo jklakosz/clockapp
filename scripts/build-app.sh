@@ -22,6 +22,16 @@ rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RES_DIR"
 cp "$BIN_PATH" "$MACOS_DIR/$APP_NAME"
 
+# Bundle the Node MCP server (server.js + deps) into Resources/mcp so the app can
+# spawn it. Install deps first if missing (e.g. on a fresh CI checkout).
+echo "▸ Bundling MCP server"
+if [ ! -d "mcp/node_modules" ]; then
+    ( cd mcp && npm install --omit=dev --silent )
+fi
+mkdir -p "$RES_DIR/mcp"
+cp mcp/server.js mcp/package.json "$RES_DIR/mcp/"
+cp -R mcp/node_modules "$RES_DIR/mcp/node_modules"
+
 cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

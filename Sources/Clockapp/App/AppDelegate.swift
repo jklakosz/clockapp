@@ -37,6 +37,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .store(in: &cancellables)
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        state.shutdownMCP() // don't orphan the MCP child process
+    }
+
     // MARK: - Main menu (enables ⌘X/⌘C/⌘V in text fields even for an accessory app)
 
     private func setupMainMenu() {

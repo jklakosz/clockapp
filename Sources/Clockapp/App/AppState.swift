@@ -47,6 +47,15 @@ final class AppState: ObservableObject {
     let clockify = ClockifyClient()
     /// Set by AppDelegate; lets views request the settings window without SwiftUI scenes.
     var openSettings: (() -> Void)?
+
+    // MCP local server
+    @Published var mcpRunning = false
+    @Published var mcpError: String?
+    private var localServer: LocalAPIServer?
+    private let mcpManager = MCPProcessManager()
+    private let mcpToken = UUID().uuidString
+    var mcpURL: String { "http://127.0.0.1:\(MCPProcessManager.mcpPort)/mcp" }
+
     private let store = PersistenceStore()
     private var autoTrack: AutoTrackService?
     private var ticker: Timer?
@@ -101,6 +110,114 @@ final class AppState: ObservableObject {
         }
 
         refreshExchangeRate()
+
+        if settings.mcpEnabled { startMCP() }
+    }
+
+    // MARK: - MCP local server
+
+    func setMCPEnabled(_ enabled: Bool) {
+        settings.mcpEnabled = enabled
+        save()
+        if enabled { startMCP() } else { stopMCP() }
+    }
+
+    private func startMCP() {
+        let server = LocalAPIServer(token: mcpToken) { [weak self] req in
+            await self?.handleAPIRequest(req) ?? LocalAPIServer.Response(500, ["error": "app unavailable"])
+        }
+        do {
+            try server.start { [weak self] apiPort in
+                Task { @MainActor in
+                    guard let self else { return }
+                    let ok = self.mcpManager.start(appAPIPort: apiPort, token: self.mcpToken)
+                    self.mcpRunning = ok
+                    self.mcpError = ok ? nil : self.mcpManager.lastError
+                }
+            }
+            localServer = server
+        } catch {
+            mcpError = error.localizedDescription
+            mcpRunning = false
+        }
+    }
+
+    private func stopMCP() {
+        mcpManager.stop()
+        localServer?.stop()
+        localServer = nil
+        mcpRunning = false
+    }
+
+    /// Called by AppDelegate on quit to avoid orphaning the child process.
+    func shutdownMCP() { stopMCP() }
+
+    // MARK: - Local API handlers (used by the MCP bridge)
+
+    private func handleAPIRequest(_ req: LocalAPIServer.Request) async -> LocalAPIServer.Response {
+        switch (req.method, req.path) {
+        case ("GET", "/health"):
+            return LocalAPIServer.Response(200, ["ok": true, "tracking": isTracking])
+        case ("GET", "/current"):
+            return LocalAPIServer.Response(200, currentEntrySnapshot())
+        case ("GET", "/projects"):
+            return LocalAPIServer.Response(200, ["projects": projectsSnapshot()])
+        case ("PATCH", "/current"):
+            return patchCurrent(req.body)
+        default:
+            return LocalAPIServer.Response(404, ["error": "not found"])
+        }
+    }
+
+    private func patchCurrent(_ body: Data) -> LocalAPIServer.Response {
+        guard currentEntry != nil else {
+            return LocalAPIServer.Response(409, ["error": "no running entry"])
+        }
+        guard let obj = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else {
+            return LocalAPIServer.Response(400, ["error": "invalid json"])
+        }
+        if let desc = obj["description"] as? String {
+            updateCurrentDescription(desc)
+        }
+        // projectId present → set it; explicit null clears it.
+        if obj.keys.contains("projectId") {
+            let pid = obj["projectId"] as? String
+            setCurrentEntryProject(pid)
+        }
+        return LocalAPIServer.Response(200, currentEntrySnapshot())
+    }
+
+    private func currentEntrySnapshot() -> [String: Any] {
+        guard let e = currentEntry else { return ["running": false] }
+        let proj = project(for: e.projectId)
+        return [
+            "running": true,
+            "id": e.id,
+            "description": e.description,
+            "projectId": e.projectId ?? NSNull(),
+            "projectName": proj?.name ?? NSNull(),
+            "clientName": proj?.clientName ?? NSNull(),
+            "start": ISO8601DateFormatter().string(from: e.start),
+            "elapsedSeconds": Int(elapsed),
+        ]
+    }
+
+    private func projectsSnapshot() -> [[String: Any]] {
+        projects.map { p in
+            ["id": p.id, "name": p.name, "clientName": p.clientName ?? NSNull()]
+        }
+    }
+
+    /// Sets the running entry's project (optimistic locally, then Clockify).
+    private func setCurrentEntryProject(_ projectId: String?) {
+        guard var cur = currentEntry, cur.projectId != projectId else { return }
+        cur.projectId = projectId
+        currentEntry = cur
+        guard cur.syncState == .synced, clockify.isConfigured else { return }
+        Task {
+            try? await clockify.updateEntry(id: cur.id, description: cur.description,
+                projectId: projectId, billable: cur.billable, start: cur.start, end: nil)
+        }
     }
 
     // MARK: - Persistence

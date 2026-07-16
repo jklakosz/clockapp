@@ -56,6 +56,7 @@ enum LocKey {
     // Updates
     case sectionUpdates, currentVersionFmt, checkUpdates, updChecking, updUpToDate
     case receiveRC, receiveRCHelp
+    case sectionMCP, mcpEnable, mcpHelp, mcpRunning, mcpStopped, mcpUrlHelp, mcpCopy, mcpCopied
     case updAvailableFmt, updInstall, updInstalling, updFailedFmt
     // Weekdays (short)
     case wdMon, wdTue, wdWed, wdThu, wdFri, wdSat, wdSun
@@ -186,6 +187,15 @@ enum Localization {
 
         .receiveRC: T(fr: "Recevoir les versions candidates (RC)", en: "Receive release candidates (RC)", pt: "Receber versões candidatas (RC)", it: "Ricevi release candidate (RC)", tn: "أستقبل النسخ التجريبية (RC)"),
         .receiveRCHelp: T(fr: "Propose aussi les pré-versions, avant leur sortie stable.", en: "Also offers pre-releases, before their stable release.", pt: "Também oferece pré-lançamentos, antes da versão estável.", it: "Propone anche le pre-release, prima della versione stabile.", tn: "يقترح زادة النسخ قبل ما تخرج الرسمية."),
+
+        .sectionMCP: T(fr: "Serveur MCP", en: "MCP server", pt: "Servidor MCP", it: "Server MCP", tn: "سيرفار MCP"),
+        .mcpEnable: T(fr: "Activer le serveur MCP", en: "Enable MCP server", pt: "Ativar servidor MCP", it: "Attiva server MCP", tn: "فعّل سيرفار MCP"),
+        .mcpHelp: T(fr: "Permet à un assistant (Claude…) de lire/éditer l'entrée en cours. Nécessite Node.js installé.", en: "Lets an assistant (Claude…) read/edit the running entry. Requires Node.js installed.", pt: "Permite que um assistente (Claude…) leia/edite a entrada em curso. Requer Node.js instalado.", it: "Consente a un assistente (Claude…) di leggere/modificare la voce in corso. Richiede Node.js.", tn: "يخلّي مساعد (Claude…) يقرا/يبدّل الإدخال الجاري. يلزم Node.js مركّب."),
+        .mcpRunning: T(fr: "En cours d'exécution", en: "Running", pt: "Em execução", it: "In esecuzione", tn: "خدّام"),
+        .mcpStopped: T(fr: "Arrêté", en: "Stopped", pt: "Parado", it: "Fermo", tn: "واقف"),
+        .mcpUrlHelp: T(fr: "Ajoute cette URL à ton client MCP :", en: "Add this URL to your MCP client:", pt: "Adicione este URL ao seu cliente MCP:", it: "Aggiungi questo URL al tuo client MCP:", tn: "زيد هالURL في client MCP متاعك:"),
+        .mcpCopy: T(fr: "Copier", en: "Copy", pt: "Copiar", it: "Copia", tn: "أنسخ"),
+        .mcpCopied: T(fr: "Copié !", en: "Copied!", pt: "Copiado!", it: "Copiato!", tn: "تنسخ!"),
 
         .sectionUpdates: T(fr: "Mises à jour", en: "Updates", pt: "Atualizações", it: "Aggiornamenti", tn: "التحديثات"),
         .currentVersionFmt: T(fr: "Version actuelle : %@", en: "Current version: %@", pt: "Versão atual: %@", it: "Versione attuale: %@", tn: "النسخة الحالية: %@"),

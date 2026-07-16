@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct SettingsView: View {
     @EnvironmentObject private var state: AppState
@@ -19,6 +20,7 @@ struct SettingsView: View {
 private struct ClockifyTab: View {
     @EnvironmentObject private var state: AppState
     @State private var apiKeyInput = ""
+    @State private var mcpCopied = false
 
     var body: some View {
         Form {
@@ -97,6 +99,38 @@ private struct ClockifyTab: View {
                 ))
                 Text(state.t(.receiveRCHelp))
                     .font(.caption).foregroundStyle(.secondary)
+            }
+
+            Section(state.t(.sectionMCP)) {
+                Toggle(state.t(.mcpEnable), isOn: Binding(
+                    get: { state.settings.mcpEnabled },
+                    set: { state.setMCPEnabled($0) }
+                ))
+                Text(state.t(.mcpHelp)).font(.caption).foregroundStyle(.secondary)
+
+                if state.settings.mcpEnabled {
+                    HStack(spacing: 6) {
+                        Circle().fill(state.mcpRunning ? .green : .orange).frame(width: 7, height: 7)
+                        Text(state.mcpRunning ? state.t(.mcpRunning) : state.t(.mcpStopped))
+                            .font(.caption).foregroundStyle(.secondary)
+                        if let err = state.mcpError, !state.mcpRunning {
+                            Text("— \(err)").font(.caption2).foregroundStyle(.red).lineLimit(1)
+                        }
+                    }
+                    if state.mcpRunning {
+                        Text(state.t(.mcpUrlHelp)).font(.caption).foregroundStyle(.secondary)
+                        HStack {
+                            Text(state.mcpURL).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
+                            Spacer()
+                            Button(mcpCopied ? state.t(.mcpCopied) : state.t(.mcpCopy)) {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(state.mcpURL, forType: .string)
+                                mcpCopied = true
+                            }
+                            .controlSize(.small)
+                        }
+                    }
+                }
             }
 
             Section(state.t(.sectionLanguage)) {

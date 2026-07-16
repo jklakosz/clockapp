@@ -1,0 +1,11 @@
+{
+  "name": "clockapp-mcp",
+  "version": "0.1.0",
+  "description": "MCP server to read/edit the running Clockify time entry",
+  "type": "module",
+  "bin": { "clockapp-mcp": "index.js" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.23.0"
+  }
+}
