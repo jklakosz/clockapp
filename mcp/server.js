@@ -8,6 +8,7 @@
 //   APP_API_TOKEN  bearer token for that API
 //   MCP_PORT       port this MCP server listens on for the MCP client (Claude)
 import { createServer } from "node:http";
+import { randomUUID } from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
@@ -39,9 +40,14 @@ async function app(method, path, body) {
 
 const asText = (obj) => ({ content: [{ type: "text", text: JSON.stringify(obj, null, 2) }] });
 
-// --- MCP server + tools ---
-const server = new McpServer({ name: "clockapp", version: "0.1.0" });
+// --- MCP server + tools (a fresh instance per session) ---
+function buildServer() {
+  const server = new McpServer({ name: "clockapp", version: "0.1.0" });
+  registerTools(server);
+  return server;
+}
 
+function registerTools(server) {
 server.registerTool(
   "get_current_entry",
   {
@@ -80,24 +86,49 @@ server.registerTool(
   },
   async () => asText(await app("GET", "/projects")),
 );
+}
 
-// --- Streamable HTTP transport (stateless: fine for a single local client) ---
-const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-await server.connect(transport);
+// --- Streamable HTTP transport with session management ---
+// A real MCP client sends `initialize` then subsequent requests carry the
+// Mcp-Session-Id header; we keep one transport per session.
+const transports = {};
 
-const http = createServer((req, res) => {
-  if (req.url !== "/mcp") {
+const isInitialize = (body) =>
+  Array.isArray(body) ? body.some((m) => m?.method === "initialize") : body?.method === "initialize";
+
+const httpServer = createServer(async (req, res) => {
+  if ((req.url || "").split("?")[0] !== "/mcp") {
     res.writeHead(404).end();
     return;
   }
-  const chunks = [];
-  req.on("data", (c) => chunks.push(c));
-  req.on("end", () => {
-    const body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : undefined;
-    transport.handleRequest(req, res, body);
-  });
+
+  let body;
+  if (req.method === "POST") {
+    const chunks = [];
+    for await (const c of req) chunks.push(c);
+    body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : undefined;
+  }
+
+  const sessionId = req.headers["mcp-session-id"];
+  let transport = sessionId ? transports[sessionId] : undefined;
+
+  if (!transport && req.method === "POST" && isInitialize(body)) {
+    transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => randomUUID(),
+      onsessioninitialized: (sid) => { transports[sid] = transport; },
+    });
+    transport.onclose = () => { if (transport.sessionId) delete transports[transport.sessionId]; };
+    await buildServer().connect(transport);
+  } else if (!transport) {
+    res.writeHead(400, { "Content-Type": "application/json" }).end(
+      JSON.stringify({ jsonrpc: "2.0", error: { code: -32000, message: "No valid session" }, id: null }),
+    );
+    return;
+  }
+
+  await transport.handleRequest(req, res, body);
 });
 
-http.listen(MCP_PORT, "127.0.0.1", () => {
+httpServer.listen(MCP_PORT, "127.0.0.1", () => {
   console.error(`clockapp MCP server on http://127.0.0.1:${MCP_PORT}/mcp`);
 });
