@@ -362,38 +362,34 @@ final class AppState: ObservableObject {
     private func handleScreenEvent(_ event: ScreenEvent) {
         switch event {
         case .locked:
+            // Locking gates future auto-starts but does NOT stop a running entry —
+            // only screen sleep stops it (below).
             isScreenLocked = true
-            if currentEntry?.source == .auto { stop() }
         case .coverStarted:
-            // Screensaver / display sleep / system sleep — user is away, stop (edge).
+            // Screensaver / display sleep / system sleep — the ONLY auto-stop trigger.
             isScreenCovered = true
             if currentEntry?.source == .auto { stop() }
         case .unlocked:
+            // Unlocking (arrival) is a start trigger, gated by the schedule.
             isScreenLocked = false
             isScreenCovered = false
             autoStartIfPossible()
         case .coverEnded:
-            // Display woke or screensaver dismissed. If the session is locked, wait
-            // for the unlock event; otherwise resume (edge).
+            // Waking the screen must NOT restart the timer — just clear the flag.
             isScreenCovered = false
-            autoStartIfPossible()
         }
     }
 
-    /// Runs every tick. Only acts on window *transitions* (edges), never on the mere
-    /// fact of being inside a window — so a manual stop is not instantly undone.
+    /// Runs every tick. The schedule is used ONLY to *start* auto-tracking when a
+    /// window opens — leaving a window never stops a running entry.
     private func evaluateSchedule() {
         guard settings.autoTrackEnabled else {
             wasInWindow = activeWindow(at: now) != nil
             return
         }
         let inWindow = activeWindow(at: now) != nil
-
-        if wasInWindow, !inWindow {
-            // Window just ended → stop only auto-started entries.
-            if currentEntry?.source == .auto { stop() }
-        } else if !wasInWindow, inWindow {
-            // Window just started → begin tracking if unlocked and idle.
+        if !wasInWindow, inWindow {
+            // Window just started → begin tracking if the user is present and idle.
             autoStartIfPossible()
         }
         wasInWindow = inWindow
