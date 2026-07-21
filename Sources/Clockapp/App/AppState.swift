@@ -212,6 +212,7 @@ final class AppState: ObservableObject {
     private func setCurrentEntryProject(_ projectId: String?) {
         guard var cur = currentEntry, cur.projectId != projectId else { return }
         cur.projectId = projectId
+        cur.billable = project(for: projectId)?.billable ?? cur.billable // adopt project default
         currentEntry = cur
         guard cur.syncState == .synced, clockify.isConfigured else { return }
         Task {
@@ -287,7 +288,10 @@ final class AppState: ObservableObject {
             settings.lastUsedProjectId = pid
             save()
         }
-        let entry = TimeEntry(start: Date(), description: description, projectId: pid, source: source, syncState: .local)
+        // Inherit the project's default billability (Clockify sets this per project).
+        let billable = project(for: pid)?.billable ?? false
+        let entry = TimeEntry(start: Date(), description: description, projectId: pid,
+                              billable: billable, source: source, syncState: .local)
         currentEntry = entry
 
         guard clockify.isConfigured, !settings.workspaceId.isEmpty else { return }
@@ -295,7 +299,7 @@ final class AppState: ObservableObject {
         Task {
             do {
                 let remoteId = try await clockify.startEntry(
-                    description: description, projectId: pid, billable: false, start: entry.start)
+                    description: description, projectId: pid, billable: billable, start: entry.start)
                 if self.currentEntry?.id == localId {
                     self.currentEntry?.id = remoteId
                     self.currentEntry?.syncState = .synced
@@ -714,22 +718,26 @@ final class AppState: ObservableObject {
 
     /// Edits an existing entry's times/description/project (optimistic locally, then Clockify).
     func updateEntry(_ entry: TimeEntry, start: Date, end: Date?, description: String, projectId: String?) {
+        // Changing project adopts the new project's default billability.
+        let billable = projectId == entry.projectId ? entry.billable : (project(for: projectId)?.billable ?? entry.billable)
         if let i = remoteEntries.firstIndex(where: { $0.id == entry.id }) {
             remoteEntries[i].start = start
             remoteEntries[i].end = end
             remoteEntries[i].description = description
             remoteEntries[i].projectId = projectId
+            remoteEntries[i].billable = billable
         }
         if currentEntry?.id == entry.id {
             currentEntry?.start = start
             currentEntry?.description = description
             currentEntry?.projectId = projectId
+            currentEntry?.billable = billable
         }
         guard clockify.isConfigured else { return }
         Task {
             do {
                 try await clockify.updateEntry(id: entry.id, description: description,
-                    projectId: projectId, billable: entry.billable, start: start, end: end)
+                    projectId: projectId, billable: billable, start: start, end: end)
                 await refreshTotals(force: true)
             } catch { /* keep optimistic copy */ }
         }

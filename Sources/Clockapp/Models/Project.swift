@@ -6,6 +6,8 @@ struct Project: Identifiable, Codable, Equatable, Hashable {
     var name: String
     var colorHex: String?
     var clientName: String?
+    /// Clockify's default billability for this project — new entries inherit it.
+    var billable: Bool = false
 
     var color: Color {
         guard let colorHex else { return .accentColor }

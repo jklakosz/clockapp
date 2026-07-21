@@ -59,7 +59,8 @@ final class ClockifyClient {
             if batch.count < 200 { break }
             page += 1
         }
-        return all.map { Project(id: $0.id, name: $0.name, colorHex: $0.color, clientName: $0.clientName) }
+        return all.map { Project(id: $0.id, name: $0.name, colorHex: $0.color,
+                                 clientName: $0.clientName, billable: $0.billable ?? false) }
     }
 
     /// Starts a running time entry (no end). Returns the Clockify entry id.
@@ -210,6 +211,7 @@ final class ClockifyClient {
         let name: String
         let color: String?
         let clientName: String?
+        let billable: Bool?
     }
 
     private struct EntryDTO: Decodable {
