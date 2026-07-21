@@ -67,12 +67,35 @@ struct Goals: Codable, Equatable {
 }
 
 enum Currency: String, Codable, CaseIterable, Identifiable {
-    case eur, usd
+    case eur, usd, gbp, chf, cad, aud, jpy
     var id: String { rawValue }
-    var symbol: String { self == .eur ? "€" : "$" }
-    /// € goes after the amount, $ before (fr vs us convention).
-    var symbolBefore: Bool { self == .usd }
-    var displayName: String { self == .eur ? "Euro (€)" : "Dollar US ($)" }
+
+    var symbol: String {
+        switch self {
+        case .eur: return "€"
+        case .usd: return "$"
+        case .gbp: return "£"
+        case .chf: return "CHF"
+        case .cad: return "CA$"
+        case .aud: return "A$"
+        case .jpy: return "¥"
+        }
+    }
+
+    /// € and CHF sit after the amount; the rest before.
+    var symbolBefore: Bool { self != .eur && self != .chf }
+
+    var displayName: String {
+        switch self {
+        case .eur: return "Euro (€)"
+        case .usd: return "Dollar US ($)"
+        case .gbp: return "Livre (£)"
+        case .chf: return "Franc suisse (CHF)"
+        case .cad: return "Dollar canadien (CA$)"
+        case .aud: return "Dollar australien (A$)"
+        case .jpy: return "Yen (¥)"
+        }
+    }
 }
 
 /// Earnings estimation from tracked time, with optional URSSAF (French social
@@ -81,9 +104,32 @@ enum Currency: String, Codable, CaseIterable, Identifiable {
 struct Earnings: Codable, Equatable {
     var enabled: Bool = false
     var hourlyRate: Double = 0
+    /// Currency of the hourly rate.
     var currency: Currency = .eur
+    /// Currency to also display amounts in (converted via ECB rates).
+    var convertTo: Currency = .usd
     var urssafEnabled: Bool = false
     var urssafRatePercent: Double = 26.1
+
+    init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case enabled, hourlyRate, currency, convertTo, urssafEnabled, urssafRatePercent
+    }
+
+    // Tolerant decoding so adding fields never wipes saved earnings.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
+        hourlyRate = try c.decodeIfPresent(Double.self, forKey: .hourlyRate) ?? 0
+        currency = try c.decodeIfPresent(Currency.self, forKey: .currency) ?? .eur
+        convertTo = try c.decodeIfPresent(Currency.self, forKey: .convertTo) ?? .usd
+        urssafEnabled = try c.decodeIfPresent(Bool.self, forKey: .urssafEnabled) ?? false
+        urssafRatePercent = try c.decodeIfPresent(Double.self, forKey: .urssafRatePercent) ?? 26.1
+    }
+
+    /// Whether a currency conversion is meaningful (different target).
+    var convertsCurrency: Bool { convertTo != currency }
 
     /// Gross amount for a given tracked duration.
     func gross(for seconds: TimeInterval) -> Double {

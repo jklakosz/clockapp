@@ -160,17 +160,26 @@ struct MenuContentView: View {
         let showNet = state.earnings.urssafEnabled
         let amount = showNet ? state.monthNet : state.monthGross
         let label = showNet ? state.t(.net) : state.t(.gross)
-        return HStack(spacing: 6) {
+        let converted = state.converted(amount)
+        return HStack(alignment: .top, spacing: 6) {
             Image(systemName: "eurosign.circle").foregroundStyle(.secondary)
             Text(state.t(.earnedThisMonth)).font(.caption).foregroundStyle(.secondary)
             Spacer()
             VStack(alignment: .trailing, spacing: 0) {
-                Text(Format.money(amount, state.earnings.currency))
-                    .font(.callout).monospacedDigit()
-                    + Text(" \(label)").font(.caption2).foregroundColor(.secondary)
-                if let conv = state.converted(amount) {
-                    Text("~\(Format.money(conv, state.earnings.currency.other))")
+                if let converted {
+                    // Converted (target) currency is the headline; original is secondary.
+                    Text(Format.money(converted, state.earnings.convertTo))
+                        .font(.callout).monospacedDigit()
+                        + Text(" \(label)").font(.caption2).foregroundColor(.secondary)
+                    Text("= \(Format.money(amount, state.earnings.currency))")
                         .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                    if let rate = state.rateDescription {
+                        Text(rate).font(.system(size: 9)).foregroundStyle(.tertiary).monospacedDigit()
+                    }
+                } else {
+                    Text(Format.money(amount, state.earnings.currency))
+                        .font(.callout).monospacedDigit()
+                        + Text(" \(label)").font(.caption2).foregroundColor(.secondary)
                 }
             }
         }

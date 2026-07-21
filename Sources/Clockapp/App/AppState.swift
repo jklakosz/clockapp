@@ -670,21 +670,28 @@ final class AppState: ObservableObject {
     var monthUrssaf: Double { earnings.urssaf(for: monthTotal) }
     var monthNet: Double { earnings.net(for: monthTotal) }
 
-    /// Rate from the user's currency to the other one (for the dual display). Nil until fetched.
-    @Published var fxToOther: Double?
+    /// Rate from the rate currency to the target currency (for the dual display). Nil until fetched.
+    @Published var fxRate: Double?
 
-    /// Converts an amount in the user's currency to the other currency, if the rate is known.
+    /// Converts an amount from the rate currency to the target currency, if applicable.
     func converted(_ amount: Double) -> Double? {
-        fxToOther.map { amount * $0 }
+        guard earnings.convertsCurrency, let r = fxRate else { return nil }
+        return amount * r
+    }
+
+    /// "1 € = 1.0823 $" for the current pair, or nil if no conversion / rate unknown.
+    var rateDescription: String? {
+        guard earnings.convertsCurrency, let r = fxRate else { return nil }
+        return "1 \(earnings.currency.symbol) = \(String(format: "%.4f", r)) \(earnings.convertTo.symbol)"
     }
 
     func refreshExchangeRate() {
         lastFxRefresh = now
         let from = earnings.currency
-        let to = from.other
+        let to = earnings.convertTo
         Task {
             let rate = await ExchangeRateService.shared.rate(from: from, to: to)
-            if earnings.currency == from { fxToOther = rate }
+            if earnings.currency == from, earnings.convertTo == to { fxRate = rate }
         }
     }
 
@@ -700,6 +707,25 @@ final class AppState: ObservableObject {
             list.append(cur)
         }
         return list.sorted { $0.start > $1.start }
+    }
+
+    /// This week's entries (Clockify + the running one), most recent first.
+    var weekEntries: [TimeEntry] {
+        guard let interval = Calendar.current.dateInterval(of: .weekOfYear, for: now) else { return [] }
+        var list = remoteEntries.filter { $0.start >= interval.start && $0.start < interval.end }
+        if let cur = currentEntry, cur.start >= interval.start, !list.contains(where: { $0.id == cur.id }) {
+            list.append(cur)
+        }
+        return list.sorted { $0.start > $1.start }
+    }
+
+    /// This week's entries grouped by day (most recent day first), with each day's total.
+    var weekEntriesByDay: [(day: Date, entries: [TimeEntry], total: TimeInterval)] {
+        let cal = Calendar.current
+        let groups = Dictionary(grouping: weekEntries) { cal.startOfDay(for: $0.start) }
+        return groups
+            .map { (day: $0.key, entries: $0.value, total: StatsService.total(for: $0.value, on: $0.key, asOf: now)) }
+            .sorted { $0.day > $1.day }
     }
 
     // MARK: - Entry editing
@@ -745,9 +771,10 @@ final class AppState: ObservableObject {
 
     // MARK: - Smart merge
 
-    /// Chains of today's entries that Smart merge would collapse (>= 2 each).
+    /// Chains of this week's entries that Smart merge would collapse (>= 2 each).
+    /// MergeService never merges across a >10min gap, so day boundaries are safe.
     func smartMergeGroups() -> [[TimeEntry]] {
-        MergeService.plan(todayEntries)
+        MergeService.plan(weekEntries)
     }
 
     /// Applies a merge plan: extends the first entry of each chain and deletes the rest,

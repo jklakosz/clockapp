@@ -1,53 +1,66 @@
 import SwiftUI
 
-/// The "Entrées" tab: today's time entries, each expandable to edit times/description
-/// or delete. Backed by Clockify (optimistic local updates, then resync).
+/// The "Entrées" tab: this week's time entries grouped by day, each expandable to edit
+/// times/description/project or delete. Backed by Clockify (optimistic, then resync).
 struct TodayEntriesView: View {
     @EnvironmentObject private var state: AppState
     @State private var mergeGroups: [[TimeEntry]] = []
     @State private var showMergeConfirm = false
     @State private var mergeMessage = ""
 
+    private func dayLabel(_ day: Date) -> String {
+        let f = DateFormatter()
+        f.locale = state.settings.language.locale
+        f.dateFormat = "EEEE d MMM"
+        return f.string(from: day)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(state.t(.today)).font(.caption).foregroundStyle(.secondary)
+                Text(state.t(.thisWeek)).font(.caption).foregroundStyle(.secondary)
                 Spacer()
-                Text(Format.hoursMinutes(state.todayTotal))
+                Text(Format.hoursMinutes(state.weekTotal))
                     .font(.caption).monospacedDigit().foregroundStyle(.secondary)
             }
 
-            if state.todayEntries.count >= 2 {
+            if state.weekEntries.count >= 2 {
                 Button { prepareMerge() } label: {
                     Label(state.t(.smartMerge), systemImage: "arrow.triangle.merge")
-                        .font(.caption)
+                        .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
-                .controlSize(.small)
+                .controlSize(.regular)
+                .tint(.accentColor)
             }
 
-            if state.todayEntries.isEmpty {
+            if state.weekEntries.isEmpty {
                 Text(state.t(.noEntriesToday))
                     .font(.caption2).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 12)
             } else {
                 ScrollView {
-                    VStack(spacing: 4) {
-                        ForEach(state.todayEntries) { entry in
-                            EntryRow(
-                                entry: entry,
-                                project: state.project(for: entry.projectId),
-                                isRunning: entry.id == state.currentEntry?.id,
-                                onSave: { start, end, desc, pid in
-                                    state.updateEntry(entry, start: start, end: end, description: desc, projectId: pid)
-                                },
-                                onDelete: { state.deleteEntry(entry) }
-                            )
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(state.weekEntriesByDay, id: \.day) { group in
+                            dayHeader(group.day, total: group.total)
+                            VStack(spacing: 4) {
+                                ForEach(group.entries) { entry in
+                                    EntryRow(
+                                        entry: entry,
+                                        project: state.project(for: entry.projectId),
+                                        isRunning: entry.id == state.currentEntry?.id,
+                                        onSave: { start, end, desc, pid in
+                                            state.updateEntry(entry, start: start, end: end, description: desc, projectId: pid)
+                                        },
+                                        onDelete: { state.deleteEntry(entry) }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
-                .frame(maxHeight: 260)
+                .frame(maxHeight: 340)
             }
         }
         .alert(state.t(.mergeTitle), isPresented: $showMergeConfirm) {
@@ -62,6 +75,17 @@ struct TodayEntriesView: View {
         }
     }
 
+    private func dayHeader(_ day: Date, total: TimeInterval) -> some View {
+        HStack {
+            Text(dayLabel(day).capitalized)
+                .font(.caption).fontWeight(.semibold)
+            Spacer()
+            Text(Format.hoursMinutes(total))
+                .font(.caption2).monospacedDigit().foregroundStyle(.secondary)
+        }
+        .padding(.top, 2)
+    }
+
     private func prepareMerge() {
         let groups = state.smartMergeGroups()
         let deleted = MergeService.deletedCount(groups)
@@ -69,7 +93,7 @@ struct TodayEntriesView: View {
             mergeGroups = []
             mergeMessage = state.t(.mergeNothing)
         } else {
-            let before = state.todayEntries.filter { $0.end != nil }.count
+            let before = state.weekEntries.filter { $0.end != nil }.count
             mergeGroups = groups
             mergeMessage = state.t(.mergeMsgFmt, before, before - deleted, deleted)
         }

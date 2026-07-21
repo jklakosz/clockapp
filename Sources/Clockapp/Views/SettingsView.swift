@@ -193,10 +193,10 @@ private struct EarningsTab: View {
 
     private var e: Binding<Earnings> {
         Binding(get: { state.earnings }, set: {
-            let currencyChanged = $0.currency != state.earnings.currency
+            let pairChanged = $0.currency != state.earnings.currency || $0.convertTo != state.earnings.convertTo
             state.earnings = $0
             state.save()
-            if currencyChanged { state.refreshExchangeRate() }
+            if pairChanged { state.refreshExchangeRate() }
         })
     }
 
@@ -219,6 +219,16 @@ private struct EarningsTab: View {
                         Text(c.displayName).tag(c)
                     }
                 }
+
+                Picker(state.t(.convertTo), selection: e.convertTo) {
+                    ForEach(Currency.allCases) { c in
+                        Text(c.displayName).tag(c)
+                    }
+                }
+                if let rate = state.rateDescription {
+                    LabeledContent(state.t(.currentRate), value: rate)
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
 
             Section(state.t(.sectionUrssaf)) {
@@ -240,14 +250,16 @@ private struct EarningsTab: View {
                 Section(state.t(.earnedThisMonth)) {
                     LabeledContent(state.t(.gross).capitalized,
                                    value: Format.money(state.monthGross, state.earnings.currency,
-                                                       converted: state.converted(state.monthGross)))
+                                                       converted: state.converted(state.monthGross),
+                                                       into: state.earnings.convertTo))
                     if state.earnings.urssafEnabled {
                         LabeledContent("− \(state.t(.urssafLabel))",
                                        value: Format.money(state.monthUrssaf, state.earnings.currency))
                             .foregroundStyle(.secondary)
                         LabeledContent(state.t(.net).capitalized,
                                        value: Format.money(state.monthNet, state.earnings.currency,
-                                                           converted: state.converted(state.monthNet)))
+                                                           converted: state.converted(state.monthNet),
+                                                           into: state.earnings.convertTo))
                             .fontWeight(.semibold)
                     }
                 }

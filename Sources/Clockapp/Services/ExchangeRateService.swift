@@ -40,7 +40,3 @@ actor ExchangeRateService {
         let rates: [String: Double]
     }
 }
-
-extension Currency {
-    var other: Currency { self == .eur ? .usd : .eur }
-}

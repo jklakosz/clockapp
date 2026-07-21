@@ -24,6 +24,17 @@ enum AppLanguage: String, Codable, CaseIterable, Identifiable {
         case .tn: return "🇹🇳"
         }
     }
+
+    /// Locale for formatting dates in the chosen language.
+    var locale: Locale {
+        switch self {
+        case .fr: return Locale(identifier: "fr_FR")
+        case .en: return Locale(identifier: "en_US")
+        case .ptBR: return Locale(identifier: "pt_BR")
+        case .it: return Locale(identifier: "it_IT")
+        case .tn: return Locale(identifier: "ar_TN")
+        }
+    }
 }
 
 /// Keys for every translatable string. `*Fmt` keys are `String(format:)` templates.
@@ -52,7 +63,8 @@ enum LocKey {
     // Earnings
     case tabEarnings, sectionEarnings, enableEarnings, hourlyRate, currency
     case sectionUrssaf, urssafDeduct, urssafRate, urssafHelp
-    case earnedThisMonth, gross, net, urssafLabel
+    case earnedThisMonth, gross, net, urssafLabel, convertTo, currentRate
+    case thisWeek
     // Updates
     case sectionUpdates, currentVersionFmt, checkUpdates, updChecking, updUpToDate
     case receiveRC, receiveRCHelp
@@ -184,6 +196,9 @@ enum Localization {
         .gross: T(fr: "brut", en: "gross", pt: "bruto", it: "lordo", tn: "خام"),
         .net: T(fr: "net", en: "net", pt: "líquido", it: "netto", tn: "صافي"),
         .urssafLabel: T(fr: "URSSAF", en: "URSSAF", pt: "URSSAF", it: "URSSAF", tn: "URSSAF"),
+        .convertTo: T(fr: "Convertir vers", en: "Convert to", pt: "Converter para", it: "Converti in", tn: "حوّل لـ"),
+        .currentRate: T(fr: "Taux actuel", en: "Current rate", pt: "Taxa atual", it: "Tasso attuale", tn: "التصريف الحالي"),
+        .thisWeek: T(fr: "Cette semaine", en: "This week", pt: "Esta semana", it: "Questa settimana", tn: "هالجمعة"),
 
         .receiveRC: T(fr: "Recevoir les versions candidates (RC)", en: "Receive release candidates (RC)", pt: "Receber versões candidatas (RC)", it: "Ricevi release candidate (RC)", tn: "أستقبل النسخ التجريبية (RC)"),
         .receiveRCHelp: T(fr: "Propose aussi les pré-versions, avant leur sortie stable.", en: "Also offers pre-releases, before their stable release.", pt: "Também oferece pré-lançamentos, antes da versão estável.", it: "Propone anche le pre-release, prima della versione stabile.", tn: "يقترح زادة النسخ قبل ما تخرج الرسمية."),

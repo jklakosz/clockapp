@@ -42,9 +42,9 @@ enum Format {
     }
 
     /// "1 234 € (~1 409 $)" — primary amount plus its converted equivalent when known.
-    static func money(_ amount: Double, _ currency: Currency, converted: Double?) -> String {
+    static func money(_ amount: Double, _ currency: Currency, converted: Double?, into target: Currency) -> String {
         let primary = money(amount, currency)
         guard let converted else { return primary }
-        return "\(primary) (~\(money(converted, currency.other)))"
+        return "\(primary) (~\(money(converted, target)))"
     }
 }
