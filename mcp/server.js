@@ -110,6 +110,25 @@ server.registerTool(
   async ({ id, description }) =>
     asText(await app("PATCH", `/entries/${encodeURIComponent(id)}`, { description })),
 );
+
+server.registerTool(
+  "submit_entries",
+  {
+    description:
+      "Propose descriptions for several entries at once. Does NOT publish directly: it opens a popup in the app where the user reviews and edits each description, then confirms before publishing to Clockify. Returns immediately once the popup is open.",
+    inputSchema: {
+      entries: z
+        .array(
+          z.object({
+            id: z.string().describe("Clockify entry id (from list_entries)"),
+            description: z.string().describe("Proposed description for that entry"),
+          }),
+        )
+        .describe("List of {id, description} pairs to review"),
+    },
+  },
+  async ({ entries }) => asText(await app("POST", "/entries/review", { entries })),
+);
 }
 
 // --- Streamable HTTP transport with session management ---

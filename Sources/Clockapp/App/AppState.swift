@@ -3,6 +3,14 @@ import Combine
 import AppKit
 import ServiceManagement
 
+/// A proposed description edit awaiting the user's review in the popup.
+struct ReviewItem: Identifiable, Equatable {
+    let id: String            // Clockify entry id
+    var description: String   // editable in the popup
+    let projectName: String?
+    let timeRange: String
+}
+
 /// Central observable state: timer engine, schedule/auto-track logic, Clockify sync.
 @MainActor
 final class AppState: ObservableObject {
@@ -47,6 +55,10 @@ final class AppState: ObservableObject {
     let clockify = ClockifyClient()
     /// Set by AppDelegate; lets views request the settings window without SwiftUI scenes.
     var openSettings: (() -> Void)?
+    /// Set by AppDelegate; opens the "review descriptions" window.
+    var showReviewWindow: (() -> Void)?
+    /// Proposed description edits awaiting the user's review/confirmation.
+    @Published var reviewItems: [ReviewItem] = []
 
     // MCP local server
     @Published var mcpRunning = false
@@ -172,6 +184,8 @@ final class AppState: ObservableObject {
             return LocalAPIServer.Response(200, ["projects": projectsSnapshot()])
         case ("PATCH", "/current"):
             return patchCurrent(req.body)
+        case ("POST", "/entries/review"):
+            return openReviewFromBody(req.body)
         default:
             return LocalAPIServer.Response(404, ["error": "not found"])
         }
@@ -194,6 +208,50 @@ final class AppState: ObservableObject {
         updated.projectId = projectId
         return LocalAPIServer.Response(200, entryJSON(updated))
     }
+
+    /// Builds a review batch from {id, description} proposals and opens the review window.
+    /// Returns immediately — publishing happens when the user confirms in the popup.
+    private func openReviewFromBody(_ body: Data) -> LocalAPIServer.Response {
+        guard let obj = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
+              let arr = obj["entries"] as? [[String: Any]] else {
+            return LocalAPIServer.Response(400, ["error": "invalid json"])
+        }
+        let df = DateFormatter()
+        df.locale = settings.language.locale
+        df.dateFormat = "EEE d — HH:mm"
+        let hm = DateFormatter(); hm.dateFormat = "HH:mm"
+
+        let items: [ReviewItem] = arr.compactMap { row in
+            guard let id = row["id"] as? String,
+                  let desc = row["description"] as? String,
+                  let e = weekEntries.first(where: { $0.id == id }) else { return nil }
+            let end = e.end.map { hm.string(from: $0) } ?? "…"
+            return ReviewItem(id: id,
+                              description: desc,
+                              projectName: project(for: e.projectId)?.name,
+                              timeRange: "\(df.string(from: e.start)) – \(end)")
+        }
+        guard !items.isEmpty else {
+            return LocalAPIServer.Response(404, ["error": "no matching entries this week"])
+        }
+        reviewItems = items
+        showReviewWindow?()
+        return LocalAPIServer.Response(200, [
+            "opened": true, "count": items.count,
+            "message": "Review popup opened in the app; the user will edit and confirm before publishing.",
+        ])
+    }
+
+    /// Applies the (possibly edited) review descriptions to Clockify.
+    func publishReview() {
+        for item in reviewItems {
+            guard let e = weekEntries.first(where: { $0.id == item.id }) else { continue }
+            updateEntry(e, start: e.start, end: e.end, description: item.description, projectId: e.projectId)
+        }
+        reviewItems = []
+    }
+
+    func cancelReview() { reviewItems = [] }
 
     private func entryJSON(_ e: TimeEntry) -> [String: Any] {
         let proj = project(for: e.projectId)

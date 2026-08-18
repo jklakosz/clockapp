@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private let popover = NSPopover()
     private var settingsWindow: NSWindow?
+    private var reviewWindow: NSWindow?
     private var cancellables = Set<AnyCancellable>()
     /// Closes the panel when the user clicks anywhere outside the app.
     private var outsideClickMonitor: Any?
@@ -21,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         state = AppState()
         state.openSettings = { [weak self] in self?.showSettings() }
+        state.showReviewWindow = { [weak self] in self?.showReview() }
 
         setupMainMenu()
         setupStatusItem()
@@ -162,6 +164,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsWindow?.title = state.t(.settingsWindowTitle)
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow?.makeKeyAndOrderFront(nil)
+    }
+
+    private func showReview() {
+        popover.performClose(nil)
+        if reviewWindow == nil {
+            let hosting = NSHostingController(
+                rootView: ReviewEntriesView(onClose: { [weak self] in self?.reviewWindow?.close() })
+                    .environmentObject(state))
+            let win = NSWindow(contentViewController: hosting)
+            win.styleMask = [.titled, .closable]
+            win.isReleasedWhenClosed = false
+            win.level = .floating // pop above other apps so the user notices it
+            win.center()
+            reviewWindow = win
+        }
+        reviewWindow?.title = state.t(.reviewTitle)
+        NSApp.activate(ignoringOtherApps: true)
+        reviewWindow?.makeKeyAndOrderFront(nil)
     }
 }
 

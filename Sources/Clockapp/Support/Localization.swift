@@ -48,6 +48,7 @@ enum LocKey {
     // Entries
     case noEntriesToday, noDescription, runningLc, delete, save, description
     case smartMerge, mergeTitle, mergeMsgFmt, mergeNothing
+    case reviewTitle, reviewIntro, reviewPublish
     // Project picker
     case noProject, searchProject, noResult, noClient, defaultProject
     // Settings
@@ -139,6 +140,9 @@ enum Localization {
         .mergeTitle: T(fr: "Fusionner les entrées ?", en: "Merge entries?", pt: "Mesclar entradas?", it: "Unire le voci?", tn: "تدمج الإدخالات؟"),
         .mergeMsgFmt: T(fr: "%d entrées → %d entrées (%d supprimées sur Clockify)", en: "%d entries → %d entries (%d deleted on Clockify)", pt: "%d entradas → %d entradas (%d excluídas no Clockify)", it: "%d voci → %d voci (%d eliminate su Clockify)", tn: "%d إدخالات → %d إدخالات (%d تتفسخ من Clockify)"),
         .mergeNothing: T(fr: "Rien à fusionner aujourd'hui.", en: "Nothing to merge today.", pt: "Nada para mesclar hoje.", it: "Niente da unire oggi.", tn: "ما فماش شنو تدمج اليوم."),
+        .reviewTitle: T(fr: "Vérifier les descriptions", en: "Review descriptions", pt: "Revisar descrições", it: "Rivedi le descrizioni", tn: "راجع الوصوفات"),
+        .reviewIntro: T(fr: "Relis et modifie si besoin avant de publier sur Clockify.", en: "Review and edit if needed before publishing to Clockify.", pt: "Revise e edite se necessário antes de publicar no Clockify.", it: "Controlla e modifica se necessario prima di pubblicare su Clockify.", tn: "راجع وبدّل كان يلزم قبل ما تنشر على Clockify."),
+        .reviewPublish: T(fr: "Publier", en: "Publish", pt: "Publicar", it: "Pubblica", tn: "أنشر"),
 
         .noProject: T(fr: "Sans projet", en: "No project", pt: "Sem projeto", it: "Nessun progetto", tn: "بلا مشروع"),
         .searchProject: T(fr: "Rechercher un projet…", en: "Search a project…", pt: "Buscar um projeto…", it: "Cerca un progetto…", tn: "لوّج على مشروع…"),

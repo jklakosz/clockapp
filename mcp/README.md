@@ -25,6 +25,7 @@ So the app must be running with the toggle on.
 | `list_projects` | List projects (id, name, client) to resolve a name → id. |
 | `list_entries` | List this week's entries with their Clockify `id`, description, project, times. |
 | `set_entry_description` | Set the description of any entry, identified by its Clockify id. |
+| `submit_entries` | Propose descriptions for several entries; opens a popup in the app for the user to review/edit and confirm before publishing. Does not publish directly. |
 
 ## Connect a client
 
