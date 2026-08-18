@@ -168,20 +168,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showReview() {
         popover.performClose(nil)
-        if reviewWindow == nil {
-            let hosting = NSHostingController(
-                rootView: ReviewEntriesView(onClose: { [weak self] in self?.reviewWindow?.close() })
-                    .environmentObject(state))
-            let win = NSWindow(contentViewController: hosting)
-            win.styleMask = [.titled, .closable]
-            win.isReleasedWhenClosed = false
-            win.level = .floating // pop above other apps so the user notices it
-            win.center()
-            reviewWindow = win
-        }
-        reviewWindow?.title = state.t(.reviewTitle)
+        // Rebuild the window each time so the SwiftUI root is evaluated against the
+        // freshly-populated review items (a cached hosting controller renders stale).
+        reviewWindow?.close()
+        let hosting = NSHostingController(
+            rootView: ReviewEntriesView(onClose: { [weak self] in self?.reviewWindow?.close() })
+                .environmentObject(state))
+        let win = NSWindow(contentViewController: hosting)
+        win.styleMask = [.titled, .closable]
+        win.isReleasedWhenClosed = false
+        win.level = .floating // pop above other apps so the user notices it
+        win.title = state.t(.reviewTitle)
+        win.center()
+        reviewWindow = win
         NSApp.activate(ignoringOtherApps: true)
-        reviewWindow?.makeKeyAndOrderFront(nil)
+        win.makeKeyAndOrderFront(nil)
     }
 }
 

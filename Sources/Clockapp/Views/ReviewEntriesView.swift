@@ -9,20 +9,21 @@ struct ReviewEntriesView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(state.t(.reviewTitle)).font(.headline)
-            Text(state.t(.reviewIntro)).font(.caption).foregroundStyle(.secondary)
+            Text("\(state.reviewItems.count) · \(state.t(.reviewIntro))")
+                .font(.caption).foregroundStyle(.secondary)
 
             ScrollView {
                 VStack(spacing: 10) {
-                    ForEach($state.reviewItems) { $item in
+                    ForEach(state.reviewItems.indices, id: \.self) { i in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack(spacing: 6) {
-                                Text(item.timeRange)
+                                Text(state.reviewItems[i].timeRange)
                                     .font(.caption).monospacedDigit().foregroundStyle(.secondary)
-                                if let p = item.projectName {
+                                if let p = state.reviewItems[i].projectName {
                                     Text("· \(p)").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                                 }
                             }
-                            TextField("Description", text: $item.description, axis: .vertical)
+                            TextField("Description", text: $state.reviewItems[i].description, axis: .vertical)
                                 .textFieldStyle(.roundedBorder)
                                 .lineLimit(1...4)
                         }
@@ -32,7 +33,7 @@ struct ReviewEntriesView: View {
                 }
                 .padding(.vertical, 2)
             }
-            .frame(maxHeight: 360)
+            .frame(minHeight: 80, maxHeight: 360)
 
             HStack {
                 Button(state.t(.cancel)) { state.cancelReview(); onClose() }
