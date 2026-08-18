@@ -86,6 +86,30 @@ server.registerTool(
   },
   async () => asText(await app("GET", "/projects")),
 );
+
+server.registerTool(
+  "list_entries",
+  {
+    description:
+      "List this week's time entries. Each has a Clockify `id`, description, project/client, start, end, durationSeconds and a `running` flag. Use the id with set_entry_description.",
+    inputSchema: {},
+  },
+  async () => asText(await app("GET", "/entries")),
+);
+
+server.registerTool(
+  "set_entry_description",
+  {
+    description:
+      "Set the description of a specific time entry, identified by its Clockify id (from list_entries).",
+    inputSchema: {
+      id: z.string().describe("Clockify entry id (from list_entries)"),
+      description: z.string().describe("New description for that entry"),
+    },
+  },
+  async ({ id, description }) =>
+    asText(await app("PATCH", `/entries/${encodeURIComponent(id)}`, { description })),
+);
 }
 
 // --- Streamable HTTP transport with session management ---

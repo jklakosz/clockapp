@@ -23,10 +23,11 @@ mkdir -p "$MACOS_DIR" "$RES_DIR"
 cp "$BIN_PATH" "$MACOS_DIR/$APP_NAME"
 
 # Bundle the Node MCP server (server.js + deps) into Resources/mcp so the app can
-# spawn it. Install deps first if missing (e.g. on a fresh CI checkout).
+# spawn it. Install deps if missing (e.g. fresh CI checkout) using `npm ci`, which
+# installs the EXACT versions pinned in package-lock.json and never updates them.
 echo "▸ Bundling MCP server"
 if [ ! -d "mcp/node_modules" ]; then
-    ( cd mcp && npm install --omit=dev --silent )
+    ( cd mcp && npm ci --silent )
 fi
 mkdir -p "$RES_DIR/mcp"
 cp mcp/server.js mcp/package.json "$RES_DIR/mcp/"

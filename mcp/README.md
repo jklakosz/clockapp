@@ -23,6 +23,8 @@ So the app must be running with the toggle on.
 | `set_description` | Set the running entry's description. |
 | `set_project` | Set the running entry's project (by id, or null to clear). |
 | `list_projects` | List projects (id, name, client) to resolve a name → id. |
+| `list_entries` | List this week's entries with their Clockify `id`, description, project, times. |
+| `set_entry_description` | Set the description of any entry, identified by its Clockify id. |
 
 ## Connect a client
 

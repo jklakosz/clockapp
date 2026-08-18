@@ -155,11 +155,19 @@ final class AppState: ObservableObject {
     // MARK: - Local API handlers (used by the MCP bridge)
 
     private func handleAPIRequest(_ req: LocalAPIServer.Request) async -> LocalAPIServer.Response {
+        // PATCH /entries/{id} — edit a specific entry by its Clockify id.
+        if req.method == "PATCH", req.path.hasPrefix("/entries/") {
+            let raw = String(req.path.dropFirst("/entries/".count))
+            let id = raw.removingPercentEncoding ?? raw
+            return editEntry(id: id, body: req.body)
+        }
         switch (req.method, req.path) {
         case ("GET", "/health"):
             return LocalAPIServer.Response(200, ["ok": true, "tracking": isTracking])
         case ("GET", "/current"):
             return LocalAPIServer.Response(200, currentEntrySnapshot())
+        case ("GET", "/entries"):
+            return LocalAPIServer.Response(200, ["entries": weekEntries.map(entryJSON)])
         case ("GET", "/projects"):
             return LocalAPIServer.Response(200, ["projects": projectsSnapshot()])
         case ("PATCH", "/current"):
@@ -167,6 +175,40 @@ final class AppState: ObservableObject {
         default:
             return LocalAPIServer.Response(404, ["error": "not found"])
         }
+    }
+
+    /// Edits an entry (found by id among this week's entries or the running one).
+    private func editEntry(id: String, body: Data) -> LocalAPIServer.Response {
+        guard let entry = weekEntries.first(where: { $0.id == id }) ?? (currentEntry?.id == id ? currentEntry : nil) else {
+            return LocalAPIServer.Response(404, ["error": "entry not found"])
+        }
+        guard let obj = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else {
+            return LocalAPIServer.Response(400, ["error": "invalid json"])
+        }
+        let description = obj["description"] as? String ?? entry.description
+        let projectId = obj.keys.contains("projectId") ? obj["projectId"] as? String : entry.projectId
+        updateEntry(entry, start: entry.start, end: entry.end, description: description, projectId: projectId)
+        // Reflect the edit in the returned snapshot.
+        var updated = entry
+        updated.description = description
+        updated.projectId = projectId
+        return LocalAPIServer.Response(200, entryJSON(updated))
+    }
+
+    private func entryJSON(_ e: TimeEntry) -> [String: Any] {
+        let proj = project(for: e.projectId)
+        return [
+            "id": e.id,
+            "description": e.description,
+            "projectId": e.projectId ?? NSNull(),
+            "projectName": proj?.name ?? NSNull(),
+            "clientName": proj?.clientName ?? NSNull(),
+            "billable": e.billable,
+            "start": ISO8601DateFormatter().string(from: e.start),
+            "end": e.end.map { ISO8601DateFormatter().string(from: $0) } ?? NSNull(),
+            "durationSeconds": Int(e.duration(asOf: now)),
+            "running": e.end == nil,
+        ]
     }
 
     private func patchCurrent(_ body: Data) -> LocalAPIServer.Response {
