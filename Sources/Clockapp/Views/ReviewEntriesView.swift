@@ -33,7 +33,7 @@ struct ReviewEntriesView: View {
                 }
                 .padding(.vertical, 2)
             }
-            .frame(minHeight: 80, maxHeight: 360)
+            .frame(minHeight: 220, maxHeight: 560)
 
             HStack {
                 Button(state.t(.cancel)) { state.cancelReview(); onClose() }
