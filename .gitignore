@@ -4,3 +4,6 @@ dist/
 .DS_Store
 .swiftpm/
 mcp/node_modules/
+
+# Personal notes, kept local (not pushed)
+docs/auto-description-ideas.md

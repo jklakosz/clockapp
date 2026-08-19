@@ -18,13 +18,13 @@ struct TodayEntriesView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(state.t(.thisWeek)).font(.caption).foregroundStyle(.secondary)
+                Text(state.t(.tabEntries)).font(.caption).foregroundStyle(.secondary)
                 Spacer()
-                Text(Format.hoursMinutes(state.weekTotal))
+                Text("\(state.t(.today)) \(Format.hoursMinutes(state.todayTotal))")
                     .font(.caption).monospacedDigit().foregroundStyle(.secondary)
             }
 
-            if state.weekEntries.count >= 2 {
+            if state.listEntries.count >= 2 {
                 Button { prepareMerge() } label: {
                     Label(state.t(.smartMerge), systemImage: "arrow.triangle.merge")
                         .frame(maxWidth: .infinity)
@@ -34,15 +34,20 @@ struct TodayEntriesView: View {
                 .tint(.accentColor)
             }
 
-            if state.weekEntries.isEmpty {
-                Text(state.t(.noEntriesToday))
-                    .font(.caption2).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 12)
+            if state.listEntries.isEmpty {
+                Group {
+                    if state.historyLoading {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Text(state.t(.noEntriesToday)).font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 12)
             } else {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 10) {
-                        ForEach(state.weekEntriesByDay, id: \.day) { group in
+                    LazyVStack(alignment: .leading, spacing: 10) {
+                        ForEach(state.listEntriesByDay, id: \.day) { group in
                             dayHeader(group.day, total: group.total)
                             VStack(spacing: 4) {
                                 ForEach(group.entries) { entry in
@@ -58,11 +63,13 @@ struct TodayEntriesView: View {
                                 }
                             }
                         }
+                        loadMoreFooter
                     }
                 }
-                .frame(maxHeight: 340)
+                .frame(maxHeight: 360)
             }
         }
+        .onAppear { if state.historyEntries.isEmpty { state.resetHistory() } }
         .alert(state.t(.mergeTitle), isPresented: $showMergeConfirm) {
             if mergeGroups.isEmpty {
                 Button("OK", role: .cancel) {}
@@ -72,6 +79,19 @@ struct TodayEntriesView: View {
             }
         } message: {
             Text(mergeMessage)
+        }
+    }
+
+    /// Bottom sentinel: appearing triggers the next page; shows a spinner while loading.
+    @ViewBuilder private var loadMoreFooter: some View {
+        if !state.historyReachedEnd {
+            HStack {
+                Spacer()
+                ProgressView().controlSize(.small)
+                Spacer()
+            }
+            .padding(.vertical, 6)
+            .onAppear { Task { await state.loadMoreHistory() } }
         }
     }
 
@@ -93,7 +113,7 @@ struct TodayEntriesView: View {
             mergeGroups = []
             mergeMessage = state.t(.mergeNothing)
         } else {
-            let before = state.weekEntries.filter { $0.end != nil }.count
+            let before = state.listEntries.filter { $0.end != nil }.count
             mergeGroups = groups
             mergeMessage = state.t(.mergeMsgFmt, before, before - deleted, deleted)
         }
@@ -132,7 +152,7 @@ private struct EntryRow: View {
         HStack(spacing: 8) {
             Circle().fill(project?.color ?? .gray).frame(width: 8, height: 8)
             VStack(alignment: .leading, spacing: 1) {
-                Text(title).font(.caption).lineLimit(1)
+                Text(title).font(.caption).lineLimit(2).fixedSize(horizontal: false, vertical: true)
                 Text(timeSummary).font(.caption2).foregroundStyle(.secondary)
             }
             Spacer()
@@ -160,8 +180,9 @@ private struct EntryRow: View {
 
     private var editor: some View {
         VStack(alignment: .leading, spacing: 8) {
-            TextField(state.t(.description), text: $editDesc)
+            TextField(state.t(.description), text: $editDesc, axis: .vertical)
                 .textFieldStyle(.roundedBorder)
+                .lineLimit(2...6)
             ProjectPicker(projects: state.projects, selection: $editProjectId,
                           label: state.t(.project))
             HStack(spacing: 8) {

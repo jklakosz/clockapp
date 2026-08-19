@@ -131,6 +131,24 @@ final class ClockifyClient {
         return all
     }
 
+    /// One page of the user's time entries, most-recent-first (for the infinite list).
+    func fetchTimeEntriesPage(page: Int, pageSize: Int) async throws -> [TimeEntry] {
+        let path = "/workspaces/\(workspaceId)/user/\(userId)/time-entries"
+            + "?page=\(page)&page-size=\(pageSize)"
+        let batch: [TimeEntryDTO] = try await request(path, method: "GET")
+        return batch.map { dto in
+            TimeEntry(
+                id: dto.id,
+                start: Self.parseDate(dto.timeInterval.start) ?? Date(),
+                end: dto.timeInterval.end.flatMap(Self.parseDate),
+                description: dto.description ?? "",
+                projectId: dto.projectId,
+                billable: dto.billable ?? false,
+                source: .manual,
+                syncState: .synced)
+        }
+    }
+
     /// The user's currently running entry on Clockify, if any (end is nil).
     func fetchRunningEntry() async throws -> TimeEntry? {
         let path = "/workspaces/\(workspaceId)/user/\(userId)/time-entries?in-progress=true&page-size=1"

@@ -25,7 +25,7 @@ struct ReviewEntriesView: View {
                             }
                             TextField("Description", text: $state.reviewItems[i].description, axis: .vertical)
                                 .textFieldStyle(.roundedBorder)
-                                .lineLimit(1...4)
+                                .lineLimit(2...6)
                         }
                         .padding(8)
                         .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6))

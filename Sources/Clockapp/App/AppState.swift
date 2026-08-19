@@ -193,7 +193,7 @@ final class AppState: ObservableObject {
 
     /// Edits an entry (found by id among this week's entries or the running one).
     private func editEntry(id: String, body: Data) -> LocalAPIServer.Response {
-        guard let entry = weekEntries.first(where: { $0.id == id }) ?? (currentEntry?.id == id ? currentEntry : nil) else {
+        guard let entry = knownEntry(id: id) else {
             return LocalAPIServer.Response(404, ["error": "entry not found"])
         }
         guard let obj = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else {
@@ -224,7 +224,7 @@ final class AppState: ObservableObject {
         let items: [ReviewItem] = arr.compactMap { row in
             guard let id = row["id"] as? String,
                   let desc = row["description"] as? String,
-                  let e = weekEntries.first(where: { $0.id == id }) else { return nil }
+                  let e = knownEntry(id: id) else { return nil }
             let end = e.end.map { hm.string(from: $0) } ?? "…"
             return ReviewItem(id: id,
                               description: desc,
@@ -245,7 +245,7 @@ final class AppState: ObservableObject {
     /// Applies the (possibly edited) review descriptions to Clockify.
     func publishReview() {
         for item in reviewItems {
-            guard let e = weekEntries.first(where: { $0.id == item.id }) else { continue }
+            guard let e = knownEntry(id: item.id) else { continue }
             updateEntry(e, start: e.start, end: e.end, description: item.description, projectId: e.projectId)
         }
         reviewItems = []
@@ -821,11 +821,85 @@ final class AppState: ObservableObject {
 
     /// This week's entries grouped by day (most recent day first), with each day's total.
     var weekEntriesByDay: [(day: Date, entries: [TimeEntry], total: TimeInterval)] {
+        entriesByDay(weekEntries)
+    }
+
+    // MARK: - Paginated entry history (infinite scroll in the Entries tab)
+
+    @Published var historyEntries: [TimeEntry] = []
+    @Published var historyLoading = false
+    @Published var historyReachedEnd = false
+    private var historyPage = 1
+    private let historyPageSize = 50
+
+    /// The Entries list: paginated Clockify history, plus locally-known recent entries
+    /// (freshly stopped, not yet re-fetched) and the running entry, all overlaid live.
+    var listEntries: [TimeEntry] {
+        var byId: [String: TimeEntry] = [:]
+        for e in historyEntries { byId[e.id] = e }
+        // Recent finished entries within the loaded time window (so a just-stopped entry
+        // shows immediately, before the next history fetch).
+        let oldestLoaded = historyEntries.last?.start ?? .distantPast
+        for e in recentEntries where e.start >= oldestLoaded && byId[e.id] == nil {
+            byId[e.id] = e
+        }
+        if let cur = currentEntry { byId[cur.id] = cur }
+        return byId.values.sorted { $0.start > $1.start }
+    }
+
+    var listEntriesByDay: [(day: Date, entries: [TimeEntry], total: TimeInterval)] {
+        entriesByDay(listEntries)
+    }
+
+    private func entriesByDay(_ entries: [TimeEntry]) -> [(day: Date, entries: [TimeEntry], total: TimeInterval)] {
         let cal = Calendar.current
-        let groups = Dictionary(grouping: weekEntries) { cal.startOfDay(for: $0.start) }
-        return groups
-            .map { (day: $0.key, entries: $0.value, total: StatsService.total(for: $0.value, on: $0.key, asOf: now)) }
+        return Dictionary(grouping: entries) { cal.startOfDay(for: $0.start) }
+            .map { (day: $0.key,
+                    entries: $0.value.sorted { $0.start > $1.start },
+                    total: StatsService.total(for: $0.value, on: $0.key, asOf: now)) }
             .sorted { $0.day > $1.day }
+    }
+
+    /// Reloads the history from the first page (called when the Entries tab appears).
+    func resetHistory() {
+        historyEntries = []
+        historyPage = 1
+        historyReachedEnd = false
+        Task { await loadMoreHistory() }
+    }
+
+    /// Fetches the next page and appends it (deduped). Safe to call repeatedly.
+    func loadMoreHistory() async {
+        guard clockify.isConfigured, !historyLoading, !historyReachedEnd else { return }
+        historyLoading = true
+        defer { historyLoading = false }
+        do {
+            let page = try await clockify.fetchTimeEntriesPage(page: historyPage, pageSize: historyPageSize)
+            let seen = Set(historyEntries.map(\.id))
+            historyEntries.append(contentsOf: page.filter { !seen.contains($0.id) })
+            historyPage += 1
+            if page.count < historyPageSize { historyReachedEnd = true }
+        } catch {
+            historyReachedEnd = true // stop paginating on error
+        }
+    }
+
+    /// Any known entry by id (running, this-month cache, or loaded history).
+    private func knownEntry(id: String) -> TimeEntry? {
+        if currentEntry?.id == id { return currentEntry }
+        return remoteEntries.first { $0.id == id } ?? historyEntries.first { $0.id == id }
+    }
+
+    /// Applies a mutation to an entry wherever it's held (history + month cache + running).
+    private func mutateEntry(id: String, _ transform: (inout TimeEntry) -> Void) {
+        if let i = historyEntries.firstIndex(where: { $0.id == id }) { transform(&historyEntries[i]) }
+        if let i = remoteEntries.firstIndex(where: { $0.id == id }) { transform(&remoteEntries[i]) }
+        if currentEntry?.id == id, var c = currentEntry { transform(&c); currentEntry = c }
+    }
+
+    private func forgetEntry(id: String) {
+        historyEntries.removeAll { $0.id == id }
+        remoteEntries.removeAll { $0.id == id }
     }
 
     // MARK: - Entry editing
@@ -846,18 +920,12 @@ final class AppState: ObservableObject {
     func updateEntry(_ entry: TimeEntry, start: Date, end: Date?, description: String, projectId: String?) {
         // Changing project adopts the new project's default billability.
         let billable = projectId == entry.projectId ? entry.billable : (project(for: projectId)?.billable ?? entry.billable)
-        if let i = remoteEntries.firstIndex(where: { $0.id == entry.id }) {
-            remoteEntries[i].start = start
-            remoteEntries[i].end = end
-            remoteEntries[i].description = description
-            remoteEntries[i].projectId = projectId
-            remoteEntries[i].billable = billable
-        }
-        if currentEntry?.id == entry.id {
-            currentEntry?.start = start
-            currentEntry?.description = description
-            currentEntry?.projectId = projectId
-            currentEntry?.billable = billable
+        mutateEntry(id: entry.id) {
+            $0.start = start
+            $0.end = end
+            $0.description = description
+            $0.projectId = projectId
+            $0.billable = billable
         }
         guard clockify.isConfigured else { return }
         Task {
@@ -871,10 +939,10 @@ final class AppState: ObservableObject {
 
     // MARK: - Smart merge
 
-    /// Chains of this week's entries that Smart merge would collapse (>= 2 each).
+    /// Chains of the loaded entries that Smart merge would collapse (>= 2 each).
     /// MergeService never merges across a >10min gap, so day boundaries are safe.
     func smartMergeGroups() -> [[TimeEntry]] {
-        MergeService.plan(weekEntries)
+        MergeService.plan(listEntries)
     }
 
     /// Applies a merge plan: extends the first entry of each chain and deletes the rest,
@@ -888,12 +956,9 @@ final class AppState: ObservableObject {
             let merged = MergeService.merged(from: chain)
             merges.append(merged)
             deleteIds.append(contentsOf: chain.dropFirst().map { $0.id })
-            if let i = remoteEntries.firstIndex(where: { $0.id == merged.id }) {
-                remoteEntries[i] = merged
-            }
+            mutateEntry(id: merged.id) { $0 = merged }
         }
-        let delSet = Set(deleteIds)
-        remoteEntries.removeAll { delSet.contains($0.id) }
+        for id in deleteIds { forgetEntry(id: id) }
         save()
 
         Task {
@@ -910,7 +975,7 @@ final class AppState: ObservableObject {
 
     func deleteEntry(_ entry: TimeEntry) {
         if currentEntry?.id == entry.id { currentEntry = nil }
-        remoteEntries.removeAll { $0.id == entry.id }
+        forgetEntry(id: entry.id)
         recentEntries.removeAll { $0.id == entry.id }
         save()
         guard clockify.isConfigured else { return }
