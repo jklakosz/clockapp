@@ -59,7 +59,10 @@ struct TodayEntriesView: View {
                 .frame(maxHeight: 360)
             }
         }
-        .onAppear { if state.historyEntries.isEmpty { state.resetHistory() } }
+        .onAppear {
+            if state.historyEntries.isEmpty { state.resetHistory() }
+            else { Task { await state.refreshHistoryHead() } }
+        }
         .alert(state.t(.mergeTitle), isPresented: $showMergeConfirm) {
             if mergeGroups.isEmpty {
                 Button("OK", role: .cancel) {}

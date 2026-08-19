@@ -423,6 +423,7 @@ final class AppState: ObservableObject {
         Task {
             await syncStop(entry)
             await refreshTotals(force: true)
+            await refreshHistoryHead() // show the finished entry in the list
         }
     }
 
@@ -832,19 +833,26 @@ final class AppState: ObservableObject {
     private var historyPage = 1
     private let historyPageSize = 50
 
-    /// The Entries list: paginated Clockify history, plus locally-known recent entries
-    /// (freshly stopped, not yet re-fetched) and the running entry, all overlaid live.
+    /// The Entries list = Clockify history (source of truth), with the running entry
+    /// overlaid live. We do NOT mix in the local `recentEntries` cache — it can hold
+    /// unsynced/local-id entries that would show up as phantom duplicates.
     var listEntries: [TimeEntry] {
-        var byId: [String: TimeEntry] = [:]
-        for e in historyEntries { byId[e.id] = e }
-        // Recent finished entries within the loaded time window (so a just-stopped entry
-        // shows immediately, before the next history fetch).
-        let oldestLoaded = historyEntries.last?.start ?? .distantPast
-        for e in recentEntries where e.start >= oldestLoaded && byId[e.id] == nil {
-            byId[e.id] = e
+        var list = historyEntries
+        if let cur = currentEntry {
+            if let i = list.firstIndex(where: { $0.id == cur.id }) { list[i] = cur }
+            else { list.append(cur) }
         }
-        if let cur = currentEntry { byId[cur.id] = cur }
-        return byId.values.sorted { $0.start > $1.start }
+        return list.sorted { $0.start > $1.start }
+    }
+
+    /// Re-fetches the newest page and merges it in (dedup by Clockify id), so a just-
+    /// stopped/edited entry appears without a full reload.
+    func refreshHistoryHead() async {
+        guard clockify.isConfigured, !historyEntries.isEmpty else { return }
+        guard let page = try? await clockify.fetchTimeEntriesPage(page: 1, pageSize: historyPageSize) else { return }
+        var byId = Dictionary(historyEntries.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        for e in page { byId[e.id] = e }
+        historyEntries = byId.values.sorted { $0.start > $1.start }
     }
 
     var listEntriesByDay: [(day: Date, entries: [TimeEntry], total: TimeInterval)] {
