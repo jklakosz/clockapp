@@ -180,7 +180,8 @@ private struct EntryRow: View {
         VStack(alignment: .leading, spacing: 8) {
             TextField(state.t(.description), text: $editDesc, axis: .vertical)
                 .textFieldStyle(.roundedBorder)
-                .lineLimit(2...6)
+                .lineLimit(6)
+                .frame(minHeight: 44, alignment: .top)
             ProjectPicker(projects: state.projects, selection: $editProjectId,
                           label: state.t(.project))
             HStack(spacing: 8) {
