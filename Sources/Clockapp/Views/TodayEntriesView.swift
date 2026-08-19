@@ -24,16 +24,6 @@ struct TodayEntriesView: View {
                     .font(.caption).monospacedDigit().foregroundStyle(.secondary)
             }
 
-            if state.listEntries.count >= 2 {
-                Button { prepareMerge() } label: {
-                    Label(state.t(.smartMerge), systemImage: "arrow.triangle.merge")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.regular)
-                .tint(.accentColor)
-            }
-
             if state.listEntries.isEmpty {
                 Group {
                     if state.historyLoading {
@@ -48,7 +38,7 @@ struct TodayEntriesView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 10) {
                         ForEach(state.listEntriesByDay, id: \.day) { group in
-                            dayHeader(group.day, total: group.total)
+                            dayHeader(group.day, entries: group.entries, total: group.total)
                             VStack(spacing: 4) {
                                 ForEach(group.entries) { entry in
                                     EntryRow(
@@ -95,10 +85,18 @@ struct TodayEntriesView: View {
         }
     }
 
-    private func dayHeader(_ day: Date, total: TimeInterval) -> some View {
-        HStack {
+    private func dayHeader(_ day: Date, entries: [TimeEntry], total: TimeInterval) -> some View {
+        HStack(spacing: 6) {
             Text(dayLabel(day).capitalized)
                 .font(.caption).fontWeight(.semibold)
+            if entries.count >= 2 {
+                Button { prepareMerge(day: day, dayEntries: entries) } label: {
+                    Image(systemName: "arrow.triangle.merge")
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .help(state.t(.smartMerge))
+            }
             Spacer()
             Text(Format.hoursMinutes(total))
                 .font(.caption2).monospacedDigit().foregroundStyle(.secondary)
@@ -106,14 +104,14 @@ struct TodayEntriesView: View {
         .padding(.top, 2)
     }
 
-    private func prepareMerge() {
-        let groups = state.smartMergeGroups()
+    private func prepareMerge(day: Date, dayEntries: [TimeEntry]) {
+        let groups = state.smartMergeGroups(on: day)
         let deleted = MergeService.deletedCount(groups)
         if deleted == 0 {
             mergeGroups = []
             mergeMessage = state.t(.mergeNothing)
         } else {
-            let before = state.listEntries.filter { $0.end != nil }.count
+            let before = dayEntries.filter { $0.end != nil }.count
             mergeGroups = groups
             mergeMessage = state.t(.mergeMsgFmt, before, before - deleted, deleted)
         }

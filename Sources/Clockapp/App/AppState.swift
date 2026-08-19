@@ -939,10 +939,11 @@ final class AppState: ObservableObject {
 
     // MARK: - Smart merge
 
-    /// Chains of the loaded entries that Smart merge would collapse (>= 2 each).
-    /// MergeService never merges across a >10min gap, so day boundaries are safe.
-    func smartMergeGroups() -> [[TimeEntry]] {
-        MergeService.plan(listEntries)
+    /// Chains that Smart merge would collapse for a single day (>= 2 each).
+    func smartMergeGroups(on day: Date) -> [[TimeEntry]] {
+        let cal = Calendar.current
+        let dayEntries = listEntries.filter { cal.isDate($0.start, inSameDayAs: day) }
+        return MergeService.plan(dayEntries)
     }
 
     /// Applies a merge plan: extends the first entry of each chain and deletes the rest,
