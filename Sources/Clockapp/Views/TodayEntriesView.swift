@@ -100,6 +100,18 @@ struct TodayEntriesView: View {
                 .foregroundStyle(.secondary)
                 .help(state.t(.smartMerge))
             }
+            if state.autoDescription.enabled {
+                if state.autoDescRunning {
+                    ProgressView().controlSize(.mini)
+                } else {
+                    Button { state.runAutoDescription(for: day) } label: {
+                        Image(systemName: "wand.and.stars")
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
+                    .help(state.t(.autoDescGenerate))
+                }
+            }
             Spacer()
             Text(Format.hoursMinutes(total))
                 .font(.caption2).monospacedDigit().foregroundStyle(.secondary)

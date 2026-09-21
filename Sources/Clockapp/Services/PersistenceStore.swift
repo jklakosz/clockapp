@@ -5,6 +5,7 @@ struct PersistedState: Codable {
     var settings = AppSettings()
     var goals = Goals()
     var earnings = Earnings()
+    var autoDescription = AutoDescription()
     var windows: [TrackingWindow] = []
     var projects: [Project] = []
     /// Recent finished entries kept locally for stats & offline resync (capped).
@@ -13,7 +14,7 @@ struct PersistedState: Codable {
     init() {}
 
     private enum CodingKeys: String, CodingKey {
-        case settings, goals, earnings, windows, projects, recentEntries
+        case settings, goals, earnings, autoDescription, windows, projects, recentEntries
     }
 
     // Tolerant decoding: a key added in a later version simply falls back to its
@@ -23,6 +24,7 @@ struct PersistedState: Codable {
         settings = try c.decodeIfPresent(AppSettings.self, forKey: .settings) ?? AppSettings()
         goals = try c.decodeIfPresent(Goals.self, forKey: .goals) ?? Goals()
         earnings = try c.decodeIfPresent(Earnings.self, forKey: .earnings) ?? Earnings()
+        autoDescription = try c.decodeIfPresent(AutoDescription.self, forKey: .autoDescription) ?? AutoDescription()
         windows = try c.decodeIfPresent([TrackingWindow].self, forKey: .windows) ?? []
         projects = try c.decodeIfPresent([Project].self, forKey: .projects) ?? []
         recentEntries = try c.decodeIfPresent([TimeEntry].self, forKey: .recentEntries) ?? []

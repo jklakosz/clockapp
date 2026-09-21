@@ -10,6 +10,7 @@ struct SettingsView: View {
             ScheduleEditorView().tabItem { Label(state.t(.tabSchedule), systemImage: "calendar") }
             GoalsTab().tabItem { Label(state.t(.tabGoals), systemImage: "target") }
             EarningsTab().tabItem { Label(state.t(.tabEarnings), systemImage: "eurosign.circle") }
+            AutoDescriptionTab().tabItem { Label(state.t(.tabAutoDesc), systemImage: "wand.and.stars") }
         }
         .padding(20)
     }

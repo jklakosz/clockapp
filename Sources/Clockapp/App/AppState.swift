@@ -26,6 +26,9 @@ final class AppState: ObservableObject {
     @Published var remoteEntries: [TimeEntry] = []
     @Published var goals = Goals()
     @Published var earnings = Earnings()
+    @Published var autoDescription = AutoDescription()
+    @Published var autoDescRunning = false
+    @Published var autoDescError: String?
     @Published var settings = AppSettings()
 
     // Runtime status
@@ -72,6 +75,7 @@ final class AppState: ObservableObject {
     private var autoTrack: AutoTrackService?
     private var ticker: Timer?
     private var lastNudgeMinute: Int = -1
+    private var lastAutoDescRun: Date?
     private var lastTotalsRefresh: Date?
     private var lastTrackerPoll: Date?
     /// Poll cadence for mirroring the running tracker from Clockify.
@@ -90,6 +94,7 @@ final class AppState: ObservableObject {
         settings = state.settings
         goals = state.goals
         earnings = state.earnings
+        autoDescription = state.autoDescription
         windows = state.windows
         projects = state.projects
         recentEntries = state.recentEntries
@@ -216,30 +221,91 @@ final class AppState: ObservableObject {
               let arr = obj["entries"] as? [[String: Any]] else {
             return LocalAPIServer.Response(400, ["error": "invalid json"])
         }
+        let proposals: [(id: String, description: String)] = arr.compactMap { row in
+            guard let id = row["id"] as? String, let desc = row["description"] as? String else { return nil }
+            return (id, desc)
+        }
+        let count = openReview(proposals: proposals)
+        guard count > 0 else {
+            return LocalAPIServer.Response(404, ["error": "no matching entries this week"])
+        }
+        return LocalAPIServer.Response(200, [
+            "opened": true, "count": count,
+            "message": "Review popup opened in the app; the user will edit and confirm before publishing.",
+        ])
+    }
+
+    /// Builds review items from {id, description} proposals and opens the popup.
+    /// Returns the number of matched entries (0 = nothing opened).
+    @discardableResult
+    func openReview(proposals: [(id: String, description: String)]) -> Int {
         let df = DateFormatter()
         df.locale = settings.language.locale
         df.dateFormat = "EEE d — HH:mm"
         let hm = DateFormatter(); hm.dateFormat = "HH:mm"
 
-        let items: [ReviewItem] = arr.compactMap { row in
-            guard let id = row["id"] as? String,
-                  let desc = row["description"] as? String,
-                  let e = knownEntry(id: id) else { return nil }
+        let items: [ReviewItem] = proposals.compactMap { p in
+            guard let e = knownEntry(id: p.id) else { return nil }
             let end = e.end.map { hm.string(from: $0) } ?? "…"
-            return ReviewItem(id: id,
-                              description: desc,
+            return ReviewItem(id: p.id,
+                              description: p.description,
                               projectName: project(for: e.projectId)?.name,
                               timeRange: "\(df.string(from: e.start)) – \(end)")
         }
-        guard !items.isEmpty else {
-            return LocalAPIServer.Response(404, ["error": "no matching entries this week"])
-        }
+        guard !items.isEmpty else { return 0 }
         reviewItems = items
         showReviewWindow?()
-        return LocalAPIServer.Response(200, [
-            "opened": true, "count": items.count,
-            "message": "Review popup opened in the app; the user will edit and confirm before publishing.",
-        ])
+        return items.count
+    }
+
+    // MARK: - Auto description
+
+    /// Generates descriptions for a day's entries from mapped Claude sessions (via
+    /// `claude -p`), then opens the review popup with the proposals.
+    func runAutoDescription(for day: Date) {
+        guard !autoDescRunning else { return }
+        autoDescRunning = true
+        autoDescError = nil
+        Task {
+            defer { autoDescRunning = false }
+            let cal = Calendar.current
+            let dayEntries = listEntries.filter { cal.isDate($0.start, inSameDayAs: day) && $0.end != nil }
+            guard !dayEntries.isEmpty else { autoDescError = "Aucune entrée ce jour."; return }
+
+            let hm = DateFormatter(); hm.dateFormat = "HH:mm"
+            let infos: [AutoDescriptionService.EntryInfo] = dayEntries.map { e in
+                let end = e.end.map { hm.string(from: $0) } ?? "…"
+                return .init(id: e.id,
+                             timeRange: "\(hm.string(from: e.start))–\(end)",
+                             projectName: project(for: e.projectId)?.name,
+                             currentDescription: e.description)
+            }
+
+            let presentProjects = Set(dayEntries.compactMap { $0.projectId })
+            let root = autoDescription.effectiveSessionsRoot
+            var contexts: [(project: String, text: String)] = []
+            for m in autoDescription.mappings {
+                guard let pid = m.projectId, presentProjects.contains(pid), !m.folderPath.isEmpty else { continue }
+                let text = AutoDescriptionService.sessionsText(root: root, folderPath: m.folderPath, day: day)
+                if !text.isEmpty {
+                    contexts.append((project: project(for: pid)?.name ?? m.folderPath, text: text))
+                }
+            }
+
+            let prompt = AutoDescriptionService.buildPrompt(entries: infos, folderContexts: contexts, calendar: nil)
+            do {
+                let output = try await AutoDescriptionService.runClaude(
+                    command: autoDescription.claudeCommand, prompt: prompt)
+                let descs = AutoDescriptionService.parseDescriptions(from: output)
+                let proposals = descs.compactMap { (id, desc) -> (id: String, description: String)? in
+                    dayEntries.contains(where: { $0.id == id }) ? (id, desc) : nil
+                }
+                guard !proposals.isEmpty else { autoDescError = "Aucune description générée."; return }
+                openReview(proposals: proposals)
+            } catch {
+                autoDescError = error.localizedDescription
+            }
+        }
     }
 
     /// Applies the (possibly edited) review descriptions to Clockify.
@@ -328,6 +394,7 @@ final class AppState: ObservableObject {
         s.settings = settings
         s.goals = goals
         s.earnings = earnings
+        s.autoDescription = autoDescription
         s.windows = windows
         s.projects = projects
         s.recentEntries = Array(recentEntries.prefix(maxRecentEntries))
@@ -351,6 +418,7 @@ final class AppState: ObservableObject {
         now = Date()
         evaluateSchedule()
         maybeNudge()
+        maybeAutoDescribe()
         // Periodically re-pull totals from Clockify (catches edits from other devices).
         if let last = lastTotalsRefresh, now.timeIntervalSince(last) > 300 {
             Task { await refreshTotals() }
@@ -526,6 +594,17 @@ final class AppState: ObservableObject {
     }
 
     // MARK: - Nudges
+
+    /// Fires the scheduled auto-description once at the configured time each day.
+    private func maybeAutoDescribe() {
+        guard autoDescription.enabled, autoDescription.scheduledEnabled, !autoDescRunning else { return }
+        let comps = Calendar.current.dateComponents([.hour, .minute], from: now)
+        let minuteOfDay = (comps.hour ?? 0) * 60 + (comps.minute ?? 0)
+        guard minuteOfDay == autoDescription.scheduledMinuteOfDay else { return }
+        if let last = lastAutoDescRun, Calendar.current.isDate(last, inSameDayAs: now) { return }
+        lastAutoDescRun = now
+        runAutoDescription(for: now)
+    }
 
     private func maybeNudge() {
         guard settings.nudgesEnabled else { return }

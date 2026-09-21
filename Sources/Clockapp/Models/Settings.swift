@@ -145,3 +145,46 @@ struct Earnings: Codable, Equatable {
         gross(for: seconds) - urssaf(for: seconds)
     }
 }
+
+/// Maps a Clockify project to a local folder where its Claude Code sessions live.
+struct ProjectFolder: Codable, Equatable, Identifiable {
+    var id = UUID()
+    var projectId: String?
+    var folderPath: String = ""
+}
+
+/// Auto-description settings: generate short entry descriptions from the day's Claude
+/// sessions (and meetings) via a `claude -p` invocation, presented in the review popup.
+struct AutoDescription: Codable, Equatable {
+    var enabled = false
+    var mappings: [ProjectFolder] = []
+    /// Root holding Claude Code session projects (e.g. a "trackit" home). Empty = default.
+    var claudeSessionsRoot = ""
+    /// Command used to generate descriptions (default `claude`, run with `-p`).
+    var claudeCommand = "claude"
+    var scheduledEnabled = false
+    var scheduledMinuteOfDay = 18 * 60 // 18:00
+
+    init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case enabled, mappings, claudeSessionsRoot, claudeCommand, scheduledEnabled, scheduledMinuteOfDay
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
+        mappings = try c.decodeIfPresent([ProjectFolder].self, forKey: .mappings) ?? []
+        claudeSessionsRoot = try c.decodeIfPresent(String.self, forKey: .claudeSessionsRoot) ?? ""
+        claudeCommand = try c.decodeIfPresent(String.self, forKey: .claudeCommand) ?? "claude"
+        scheduledEnabled = try c.decodeIfPresent(Bool.self, forKey: .scheduledEnabled) ?? false
+        scheduledMinuteOfDay = try c.decodeIfPresent(Int.self, forKey: .scheduledMinuteOfDay) ?? 18 * 60
+    }
+
+    /// The effective Claude sessions root (falls back to ~/.claude/projects).
+    var effectiveSessionsRoot: String {
+        claudeSessionsRoot.isEmpty
+            ? (NSHomeDirectory() as NSString).appendingPathComponent(".claude/projects")
+            : claudeSessionsRoot
+    }
+}

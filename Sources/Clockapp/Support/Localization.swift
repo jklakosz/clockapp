@@ -49,6 +49,10 @@ enum LocKey {
     case noEntriesToday, noDescription, runningLc, delete, save, description
     case smartMerge, mergeTitle, mergeMsgFmt, mergeNothing
     case reviewTitle, reviewIntro, reviewPublish
+    // Auto-description
+    case tabAutoDesc, autoDescEnable, autoDescHelp, autoDescMappings, autoDescProjectFolders
+    case autoDescSessionsRoot, autoDescSessionsHelp, autoDescCommand, autoDescCommandHelp
+    case autoDescScheduleEnable, autoDescScheduleAt, autoDescGenerate, autoDescRunningLabel, chooseFolder
     // Project picker
     case noProject, searchProject, noResult, noClient, defaultProject
     // Settings
@@ -143,6 +147,20 @@ enum Localization {
         .reviewTitle: T(fr: "Vérifier les descriptions", en: "Review descriptions", pt: "Revisar descrições", it: "Rivedi le descrizioni", tn: "راجع الوصوفات"),
         .reviewIntro: T(fr: "Relis et modifie si besoin avant de publier sur Clockify.", en: "Review and edit if needed before publishing to Clockify.", pt: "Revise e edite se necessário antes de publicar no Clockify.", it: "Controlla e modifica se necessario prima di pubblicare su Clockify.", tn: "راجع وبدّل كان يلزم قبل ما تنشر على Clockify."),
         .reviewPublish: T(fr: "Publier", en: "Publish", pt: "Publicar", it: "Pubblica", tn: "أنشر"),
+        .tabAutoDesc: T(fr: "Auto-desc", en: "Auto-desc", pt: "Auto-desc", it: "Auto-desc", tn: "Auto-desc"),
+        .autoDescEnable: T(fr: "Activer l'auto-description", en: "Enable auto-description", pt: "Ativar auto-descrição", it: "Attiva auto-descrizione", tn: "فعّل الوصف الأوتوماتيكي"),
+        .autoDescHelp: T(fr: "Génère les descriptions du jour à partir de tes sessions Claude (via `claude -p`), à relire avant publication.", en: "Generates the day's descriptions from your Claude sessions (via `claude -p`), to review before publishing.", pt: "Gera as descrições do dia a partir das suas sessões Claude (via `claude -p`), para revisar antes de publicar.", it: "Genera le descrizioni del giorno dalle tue sessioni Claude (via `claude -p`), da rivedere prima di pubblicare.", tn: "يولّد الوصوفات متاع اليوم من سيشنات Claude (بـ `claude -p`)، تراجعهم قبل ما تنشر."),
+        .autoDescMappings: T(fr: "Projets → dossiers", en: "Projects → folders", pt: "Projetos → pastas", it: "Progetti → cartelle", tn: "المشاريع ← الدوسيات"),
+        .autoDescProjectFolders: T(fr: "Associe chaque projet au dossier de ses sessions Claude.", en: "Map each project to the folder of its Claude sessions.", pt: "Associe cada projeto à pasta das suas sessões Claude.", it: "Associa ogni progetto alla cartella delle sue sessioni Claude.", tn: "اربط كل مشروع بالدوسيي متاع سيشناتو."),
+        .autoDescSessionsRoot: T(fr: "Racine des sessions Claude", en: "Claude sessions root", pt: "Raiz das sessões Claude", it: "Radice sessioni Claude", tn: "جذر سيشنات Claude"),
+        .autoDescSessionsHelp: T(fr: "Dossier contenant les projets Claude (home « trackit »). Vide = ~/.claude/projects.", en: "Folder holding the Claude projects (a \"trackit\" home). Empty = ~/.claude/projects.", pt: "Pasta com os projetos Claude (home \"trackit\"). Vazio = ~/.claude/projects.", it: "Cartella con i progetti Claude (home \"trackit\"). Vuoto = ~/.claude/projects.", tn: "الدوسيي اللي فيه مشاريع Claude (home « trackit »). فارغ = ~/.claude/projects."),
+        .autoDescCommand: T(fr: "Commande Claude", en: "Claude command", pt: "Comando Claude", it: "Comando Claude", tn: "أمر Claude"),
+        .autoDescCommandHelp: T(fr: "Exécutée avec `-p` (ex. `claude`, ou `CLAUDE_CONFIG_DIR=… claude`).", en: "Run with `-p` (e.g. `claude`, or `CLAUDE_CONFIG_DIR=… claude`).", pt: "Executado com `-p` (ex. `claude`).", it: "Eseguito con `-p` (es. `claude`).", tn: "يتنفّذ بـ `-p` (مثال `claude`)."),
+        .autoDescScheduleEnable: T(fr: "Générer automatiquement chaque jour", en: "Generate automatically every day", pt: "Gerar automaticamente todos os dias", it: "Genera automaticamente ogni giorno", tn: "ولّد أوتوماتيك كل نهار"),
+        .autoDescScheduleAt: T(fr: "À", en: "At", pt: "Às", it: "Alle", tn: "في"),
+        .autoDescGenerate: T(fr: "Auto-description", en: "Auto-describe", pt: "Auto-descrever", it: "Auto-descrivi", tn: "وصف أوتوماتيكي"),
+        .autoDescRunningLabel: T(fr: "Génération…", en: "Generating…", pt: "Gerando…", it: "Generazione…", tn: "قاعد يولّد…"),
+        .chooseFolder: T(fr: "Choisir…", en: "Choose…", pt: "Escolher…", it: "Scegli…", tn: "اختار…"),
 
         .noProject: T(fr: "Sans projet", en: "No project", pt: "Sem projeto", it: "Nessun progetto", tn: "بلا مشروع"),
         .searchProject: T(fr: "Rechercher un projet…", en: "Search a project…", pt: "Buscar um projeto…", it: "Cerca un progetto…", tn: "لوّج على مشروع…"),
