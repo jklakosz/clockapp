@@ -117,8 +117,30 @@ enum AutoDescriptionService {
         return candidates.first { FileManager.default.isExecutableFile(atPath: $0) } ?? command
     }
 
-    /// Runs `<command> -p` with the prompt (via a login shell so PATH resolves `claude`),
-    /// returning stdout. Non-blocking.
+    /// The process environment with common CLI install dirs prepended to PATH, so a
+    /// custom command (e.g. `CLAUDE_CONFIG_DIR=… claude`) resolves without a login shell.
+    private static func enrichedEnvironment() -> [String: String] {
+        var env = ProcessInfo.processInfo.environment
+        let home = NSHomeDirectory()
+        let extra = [
+            "/opt/homebrew/bin",
+            "/usr/local/bin",
+            "\(home)/.claude/local",
+            "\(home)/.local/bin",
+            "/usr/bin",
+            "/bin",
+        ]
+        let existing = env["PATH"].map { [$0] } ?? []
+        env["PATH"] = (extra + existing).joined(separator: ":")
+        return env
+    }
+
+    /// Runs `<command> -p` with the prompt and returns stdout. Non-blocking.
+    ///
+    /// Uses a plain `/bin/sh -c` (no zsh, no interactive shell — those source `~/.zshrc`,
+    /// which is slow and can hang a GUI app). `$HOME` and env prefixes like
+    /// `CLAUDE_CONFIG_DIR=… claude` still work; a bare `claude` is resolved to an absolute
+    /// path, and PATH is enriched with the usual install dirs so custom commands resolve too.
     static func runClaude(command: String, prompt: String) async throws -> String {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("clockapp-adesc-\(UUID().uuidString).txt")
@@ -126,10 +148,9 @@ enum AutoDescriptionService {
         let resolved = resolveCommand(command)
 
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        // Interactive login shell (-i) so it sources ~/.zshrc — needed to resolve zsh
-        // aliases (e.g. `ccti`) and PATH entries defined there.
-        process.arguments = ["-ilc", "\(resolved) -p \"$(cat '\(tmp.path)')\""]
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", "\(resolved) -p \"$(cat '\(tmp.path)')\""]
+        process.environment = enrichedEnvironment()
         let out = Pipe()
         let err = Pipe()
         process.standardOutput = out
