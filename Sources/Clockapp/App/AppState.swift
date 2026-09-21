@@ -621,6 +621,7 @@ final class AppState: ObservableObject {
         Task {
             await refreshTotals()
             await syncRunningEntryFromRemote()
+            await reloadHistory()
         }
     }
 
@@ -868,12 +869,22 @@ final class AppState: ObservableObject {
             .sorted { $0.day > $1.day }
     }
 
-    /// Reloads the history from the first page (called when the Entries tab appears).
+    /// Reloads the history from the first page (called when the Entries tab appears empty).
     func resetHistory() {
         historyEntries = []
         historyPage = 1
         historyReachedEnd = false
         Task { await loadMoreHistory() }
+    }
+
+    /// Fresh reload of page 1 that reflects edits/deletions (replaces, no empty flicker),
+    /// resetting pagination. Called each time the panel opens.
+    func reloadHistory() async {
+        guard clockify.isConfigured else { return }
+        guard let page = try? await clockify.fetchTimeEntriesPage(page: 1, pageSize: historyPageSize) else { return }
+        historyEntries = page
+        historyPage = 2
+        historyReachedEnd = page.count < historyPageSize
     }
 
     /// Fetches the next page and appends it (deduped). Safe to call repeatedly.
