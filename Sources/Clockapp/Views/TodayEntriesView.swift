@@ -24,6 +24,19 @@ struct TodayEntriesView: View {
                     .font(.caption).monospacedDigit().foregroundStyle(.secondary)
             }
 
+            if let err = state.autoDescError {
+                HStack(alignment: .top, spacing: 4) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                    Text(err).lineLimit(3)
+                    Spacer()
+                    Button { state.autoDescError = nil } label: { Image(systemName: "xmark") }
+                        .buttonStyle(.borderless)
+                }
+                .font(.caption2).foregroundStyle(.red)
+                .padding(6)
+                .background(Color.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
+            }
+
             if state.listEntries.isEmpty {
                 Group {
                     if state.historyLoading {
@@ -101,7 +114,7 @@ struct TodayEntriesView: View {
                 .help(state.t(.smartMerge))
             }
             if state.autoDescription.enabled {
-                if state.autoDescRunning {
+                if state.isAutoDescribing(day: day) {
                     ProgressView().controlSize(.mini)
                 } else {
                     Button { state.runAutoDescription(for: day) } label: {
@@ -110,6 +123,7 @@ struct TodayEntriesView: View {
                     .buttonStyle(.borderless)
                     .foregroundStyle(.secondary)
                     .help(state.t(.autoDescGenerate))
+                    .disabled(state.isAutoDescribing)
                 }
             }
             Spacer()

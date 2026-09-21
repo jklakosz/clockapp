@@ -98,16 +98,36 @@ enum AutoDescriptionService {
         return p
     }
 
+    /// Resolves a bare command (e.g. `claude`) to an absolute path, since a GUI app's
+    /// environment has a minimal PATH. Custom commands (with a path, env prefix or args)
+    /// are left untouched.
+    static func resolveCommand(_ command: String) -> String {
+        let trimmed = command.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, !trimmed.contains("/"), !trimmed.contains("="), !trimmed.contains(" ") else {
+            return command
+        }
+        let home = NSHomeDirectory()
+        let candidates = [
+            "/opt/homebrew/bin/\(trimmed)",
+            "/usr/local/bin/\(trimmed)",
+            "\(home)/.claude/local/\(trimmed)",
+            "\(home)/.local/bin/\(trimmed)",
+            "/usr/bin/\(trimmed)",
+        ]
+        return candidates.first { FileManager.default.isExecutableFile(atPath: $0) } ?? command
+    }
+
     /// Runs `<command> -p` with the prompt (via a login shell so PATH resolves `claude`),
     /// returning stdout. Non-blocking.
     static func runClaude(command: String, prompt: String) async throws -> String {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("clockapp-adesc-\(UUID().uuidString).txt")
         try prompt.write(to: tmp, atomically: true, encoding: .utf8)
+        let resolved = resolveCommand(command)
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        process.arguments = ["-lc", "\(command) -p \"$(cat '\(tmp.path)')\""]
+        process.arguments = ["-lc", "\(resolved) -p \"$(cat '\(tmp.path)')\""]
         let out = Pipe()
         let err = Pipe()
         process.standardOutput = out

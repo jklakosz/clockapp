@@ -27,8 +27,15 @@ final class AppState: ObservableObject {
     @Published var goals = Goals()
     @Published var earnings = Earnings()
     @Published var autoDescription = AutoDescription()
-    @Published var autoDescRunning = false
+    /// The day currently being auto-described (nil = idle), so only that day's button spins.
+    @Published var autoDescRunningDay: Date?
     @Published var autoDescError: String?
+
+    var isAutoDescribing: Bool { autoDescRunningDay != nil }
+    func isAutoDescribing(day: Date) -> Bool {
+        guard let d = autoDescRunningDay else { return false }
+        return Calendar.current.isDate(d, inSameDayAs: day)
+    }
     @Published var settings = AppSettings()
 
     // Runtime status
@@ -263,11 +270,11 @@ final class AppState: ObservableObject {
     /// Generates descriptions for a day's entries from mapped Claude sessions (via
     /// `claude -p`), then opens the review popup with the proposals.
     func runAutoDescription(for day: Date) {
-        guard !autoDescRunning else { return }
-        autoDescRunning = true
+        guard autoDescRunningDay == nil else { return }
+        autoDescRunningDay = Calendar.current.startOfDay(for: day)
         autoDescError = nil
         Task {
-            defer { autoDescRunning = false }
+            defer { autoDescRunningDay = nil }
             let cal = Calendar.current
             let dayEntries = listEntries.filter { cal.isDate($0.start, inSameDayAs: day) && $0.end != nil }
             guard !dayEntries.isEmpty else { autoDescError = "Aucune entrée ce jour."; return }
@@ -597,7 +604,7 @@ final class AppState: ObservableObject {
 
     /// Fires the scheduled auto-description once at the configured time each day.
     private func maybeAutoDescribe() {
-        guard autoDescription.enabled, autoDescription.scheduledEnabled, !autoDescRunning else { return }
+        guard autoDescription.enabled, autoDescription.scheduledEnabled, !isAutoDescribing else { return }
         let comps = Calendar.current.dateComponents([.hour, .minute], from: now)
         let minuteOfDay = (comps.hour ?? 0) * 60 + (comps.minute ?? 0)
         guard minuteOfDay == autoDescription.scheduledMinuteOfDay else { return }
