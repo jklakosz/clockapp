@@ -53,6 +53,8 @@ enum LocKey {
     case tabAutoDesc, autoDescEnable, autoDescHelp, autoDescMappings, autoDescProjectFolders
     case autoDescSessionsRoot, autoDescSessionsHelp, autoDescCommand, autoDescCommandHelp
     case autoDescScheduleEnable, autoDescScheduleAt, autoDescGenerate, autoDescRunningLabel, chooseFolder
+    case autoDescGoogleEnable, autoDescGoogleHelp, autoDescGoogleClientId, autoDescGoogleClientSecret
+    case autoDescGoogleConnect, autoDescGoogleConnected, autoDescGoogleDisconnect
     // Project picker
     case noProject, searchProject, noResult, noClient, defaultProject
     // Settings
@@ -161,6 +163,13 @@ enum Localization {
         .autoDescGenerate: T(fr: "Auto-description", en: "Auto-describe", pt: "Auto-descrever", it: "Auto-descrivi", tn: "وصف أوتوماتيكي"),
         .autoDescRunningLabel: T(fr: "Génération…", en: "Generating…", pt: "Gerando…", it: "Generazione…", tn: "قاعد يولّد…"),
         .chooseFolder: T(fr: "Choisir…", en: "Choose…", pt: "Escolher…", it: "Scegli…", tn: "اختار…"),
+        .autoDescGoogleEnable: T(fr: "Inclure les réunions Google Agenda", en: "Include Google Calendar meetings", pt: "Incluir reuniões do Google Agenda", it: "Includi riunioni Google Calendar", tn: "زيد اجتماعات Google Agenda"),
+        .autoDescGoogleHelp: T(fr: "Crée un client OAuth « Desktop » dans Google Cloud (API Calendar activée), puis colle son Client ID et son secret.", en: "Create a \"Desktop\" OAuth client in Google Cloud (Calendar API enabled), then paste its Client ID and secret.", pt: "Crie um cliente OAuth \"Desktop\" no Google Cloud (API Calendar ativada) e cole o Client ID e o segredo.", it: "Crea un client OAuth \"Desktop\" in Google Cloud (API Calendar attiva), poi incolla Client ID e secret.", tn: "اعمل client OAuth « Desktop » في Google Cloud (API Calendar مفعّلة)، وألصق الـ Client ID والـ secret."),
+        .autoDescGoogleClientId: T(fr: "Client ID", en: "Client ID", pt: "Client ID", it: "Client ID", tn: "Client ID"),
+        .autoDescGoogleClientSecret: T(fr: "Client Secret", en: "Client Secret", pt: "Client Secret", it: "Client Secret", tn: "Client Secret"),
+        .autoDescGoogleConnect: T(fr: "Connecter Google", en: "Connect Google", pt: "Conectar Google", it: "Collega Google", tn: "اربط Google"),
+        .autoDescGoogleConnected: T(fr: "Google Agenda connecté", en: "Google Calendar connected", pt: "Google Agenda conectado", it: "Google Calendar collegato", tn: "Google Agenda مربوط"),
+        .autoDescGoogleDisconnect: T(fr: "Déconnecter", en: "Disconnect", pt: "Desconectar", it: "Scollega", tn: "افصل"),
 
         .noProject: T(fr: "Sans projet", en: "No project", pt: "Sem projeto", it: "Nessun progetto", tn: "بلا مشروع"),
         .searchProject: T(fr: "Rechercher un projet…", en: "Search a project…", pt: "Buscar um projeto…", it: "Cerca un progetto…", tn: "لوّج على مشروع…"),

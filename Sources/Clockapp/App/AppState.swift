@@ -30,6 +30,10 @@ final class AppState: ObservableObject {
     /// The day currently being auto-described (nil = idle), so only that day's button spins.
     @Published var autoDescRunningDay: Date?
     @Published var autoDescError: String?
+    /// Whether a Google Calendar refresh token is stored (i.e. account connected).
+    @Published var googleConnected = false
+    /// True while the OAuth consent flow is in progress.
+    @Published var googleConnecting = false
 
     var isAutoDescribing: Bool { autoDescRunningDay != nil }
     func isAutoDescribing(day: Date) -> Bool {
@@ -102,6 +106,7 @@ final class AppState: ObservableObject {
         goals = state.goals
         earnings = state.earnings
         autoDescription = state.autoDescription
+        googleConnected = KeychainStore.shared.googleRefreshToken != nil
         windows = state.windows
         projects = state.projects
         recentEntries = state.recentEntries
@@ -299,7 +304,8 @@ final class AppState: ObservableObject {
                 }
             }
 
-            let prompt = AutoDescriptionService.buildPrompt(entries: infos, folderContexts: contexts, calendar: nil)
+            let calendarText = await todaysCalendarText(for: day)
+            let prompt = AutoDescriptionService.buildPrompt(entries: infos, folderContexts: contexts, calendar: calendarText)
             do {
                 let output = try await AutoDescriptionService.runClaude(
                     command: autoDescription.claudeCommand, prompt: prompt)
@@ -312,6 +318,64 @@ final class AppState: ObservableObject {
             } catch {
                 autoDescError = error.localizedDescription
             }
+        }
+    }
+
+    // MARK: - Google Calendar
+
+    /// Runs the OAuth consent flow in the browser and stores the resulting refresh token
+    /// (plus the client secret) in the Keychain. `clientId` comes from the settings field.
+    func googleConnect(clientSecret: String) {
+        let clientId = autoDescription.googleClientId.trimmingCharacters(in: .whitespaces)
+        let secret = clientSecret.trimmingCharacters(in: .whitespaces)
+        guard !clientId.isEmpty, !secret.isEmpty else {
+            autoDescError = "Renseigne le Client ID et le Client Secret Google."
+            return
+        }
+        guard !googleConnecting else { return }
+        googleConnecting = true
+        autoDescError = nil
+        Task {
+            defer { googleConnecting = false }
+            do {
+                let refresh = try await GoogleCalendarService.authorize(clientId: clientId, clientSecret: secret)
+                KeychainStore.shared.googleClientSecret = secret
+                KeychainStore.shared.googleRefreshToken = refresh
+                googleConnected = true
+                if !autoDescription.googleCalendarEnabled {
+                    autoDescription.googleCalendarEnabled = true
+                    save()
+                }
+            } catch {
+                autoDescError = "Google: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    /// Forgets the stored Google tokens.
+    func googleDisconnect() {
+        KeychainStore.shared.googleRefreshToken = nil
+        KeychainStore.shared.googleClientSecret = nil
+        googleConnected = false
+    }
+
+    /// The day's meetings as a newline-joined text, or nil when disabled/unavailable.
+    /// Never throws — calendar context is best-effort and must not block description generation.
+    private func todaysCalendarText(for day: Date) async -> String? {
+        guard autoDescription.googleCalendarEnabled, googleConnected else { return nil }
+        let clientId = autoDescription.googleClientId.trimmingCharacters(in: .whitespaces)
+        guard !clientId.isEmpty,
+              let secret = KeychainStore.shared.googleClientSecret,
+              let refresh = KeychainStore.shared.googleRefreshToken else { return nil }
+        do {
+            let token = try await GoogleCalendarService.accessToken(
+                clientId: clientId, clientSecret: secret, refreshToken: refresh)
+            let events = try await GoogleCalendarService.todaysEvents(accessToken: token, day: day)
+            return events.isEmpty ? nil : events.joined(separator: "\n")
+        } catch {
+            // Surface the issue but keep going without calendar context.
+            autoDescError = "Google Calendar ignoré: \(error.localizedDescription)"
+            return nil
         }
     }
 
