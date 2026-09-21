@@ -73,7 +73,8 @@ enum AutoDescriptionService {
 
     static func buildPrompt(entries: [EntryInfo],
                             folderContexts: [(project: String, text: String)],
-                            calendar: String?) -> String {
+                            calendar: String?,
+                            agentCalendarDay: Date? = nil) -> String {
         var p = """
         You write short timesheet descriptions of what was worked on during time entries.
         Given the day's entries and the context (Claude coding sessions and meetings),
@@ -90,6 +91,17 @@ enum AutoDescriptionService {
         }
         if let calendar, !calendar.isEmpty {
             p += "\n\nMEETINGS TODAY:\n\(calendar)"
+        }
+        if let day = agentCalendarDay {
+            let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd (EEEE)"; df.locale = Locale(identifier: "en_US")
+            p += """
+
+
+            You have Google Calendar tools available (via MCP). Before writing descriptions,
+            fetch the user's calendar events for \(df.string(from: day)) (restrict the query to
+            that single day) and use the meetings/calls as additional context for what was worked
+            on. If you have no calendar access, silently proceed without it — do NOT invent meetings.
+            """
         }
         for ctx in folderContexts where !ctx.text.isEmpty {
             p += "\n\n### Claude sessions — \(ctx.project)\n\(ctx.text)"

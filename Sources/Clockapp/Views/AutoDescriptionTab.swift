@@ -64,37 +64,47 @@ struct AutoDescriptionTab: View {
                 Text(state.t(.autoDescCommandHelp)).font(.caption).foregroundStyle(.secondary)
             }
 
-            Section("Google Calendar") {
-                Toggle(state.t(.autoDescGoogleEnable), isOn: a.googleCalendarEnabled)
-                Text(state.t(.autoDescGoogleHelp)).font(.caption).foregroundStyle(.secondary)
-
-                LabeledContent(state.t(.autoDescGoogleClientId)) {
-                    TextField("xxxxx.apps.googleusercontent.com", text: a.googleClientId)
-                        .frame(maxWidth: 240)
+            Section(state.t(.autoDescCalendar)) {
+                Picker(state.t(.autoDescCalendarSource), selection: a.calendarSource) {
+                    Text(state.t(.autoDescCalOff)).tag(CalendarSource.off)
+                    Text(state.t(.autoDescCalAgent)).tag(CalendarSource.agent)
+                    Text(state.t(.autoDescCalOAuth)).tag(CalendarSource.oauth)
                 }
 
-                if state.googleConnected {
-                    HStack {
-                        Label(state.t(.autoDescGoogleConnected), systemImage: "checkmark.seal.fill")
-                            .font(.caption).foregroundStyle(.green)
-                        Spacer()
-                        Button(state.t(.autoDescGoogleDisconnect), role: .destructive) {
-                            state.googleDisconnect()
-                        }.controlSize(.small)
+                switch state.autoDescription.calendarSource {
+                case .off:
+                    EmptyView()
+                case .agent:
+                    Text(state.t(.autoDescCalAgentHelp)).font(.caption).foregroundStyle(.secondary)
+                case .oauth:
+                    Text(state.t(.autoDescGoogleHelp)).font(.caption).foregroundStyle(.secondary)
+                    LabeledContent(state.t(.autoDescGoogleClientId)) {
+                        TextField("xxxxx.apps.googleusercontent.com", text: a.googleClientId)
+                            .frame(maxWidth: 240)
                     }
-                } else {
-                    LabeledContent(state.t(.autoDescGoogleClientSecret)) {
-                        SecureField("GOCSPX-…", text: $clientSecretDraft).frame(maxWidth: 240)
-                    }
-                    HStack {
-                        Spacer()
-                        Button(state.t(.autoDescGoogleConnect)) {
-                            state.googleConnect(clientSecret: clientSecretDraft)
-                            clientSecretDraft = ""
+                    if state.googleConnected {
+                        HStack {
+                            Label(state.t(.autoDescGoogleConnected), systemImage: "checkmark.seal.fill")
+                                .font(.caption).foregroundStyle(.green)
+                            Spacer()
+                            Button(state.t(.autoDescGoogleDisconnect), role: .destructive) {
+                                state.googleDisconnect()
+                            }.controlSize(.small)
                         }
-                        .controlSize(.small)
-                        .disabled(state.googleConnecting || state.autoDescription.googleClientId.isEmpty)
-                        if state.googleConnecting { ProgressView().controlSize(.small) }
+                    } else {
+                        LabeledContent(state.t(.autoDescGoogleClientSecret)) {
+                            SecureField("GOCSPX-…", text: $clientSecretDraft).frame(maxWidth: 240)
+                        }
+                        HStack {
+                            Spacer()
+                            Button(state.t(.autoDescGoogleConnect)) {
+                                state.googleConnect(clientSecret: clientSecretDraft)
+                                clientSecretDraft = ""
+                            }
+                            .controlSize(.small)
+                            .disabled(state.googleConnecting || state.autoDescription.googleClientId.isEmpty)
+                            if state.googleConnecting { ProgressView().controlSize(.small) }
+                        }
                     }
                 }
             }

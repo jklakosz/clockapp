@@ -55,6 +55,8 @@ enum LocKey {
     case autoDescScheduleEnable, autoDescScheduleAt, autoDescGenerate, autoDescRunningLabel, chooseFolder
     case autoDescGoogleEnable, autoDescGoogleHelp, autoDescGoogleClientId, autoDescGoogleClientSecret
     case autoDescGoogleConnect, autoDescGoogleConnected, autoDescGoogleDisconnect
+    case autoDescCalendar, autoDescCalendarSource, autoDescCalOff, autoDescCalAgent, autoDescCalOAuth
+    case autoDescCalAgentHelp
     // Project picker
     case noProject, searchProject, noResult, noClient, defaultProject
     // Settings
@@ -170,6 +172,12 @@ enum Localization {
         .autoDescGoogleConnect: T(fr: "Connecter Google", en: "Connect Google", pt: "Conectar Google", it: "Collega Google", tn: "اربط Google"),
         .autoDescGoogleConnected: T(fr: "Google Agenda connecté", en: "Google Calendar connected", pt: "Google Agenda conectado", it: "Google Calendar collegato", tn: "Google Agenda مربوط"),
         .autoDescGoogleDisconnect: T(fr: "Déconnecter", en: "Disconnect", pt: "Desconectar", it: "Scollega", tn: "افصل"),
+        .autoDescCalendar: T(fr: "Réunions du jour", en: "Today's meetings", pt: "Reuniões do dia", it: "Riunioni del giorno", tn: "اجتماعات النهار"),
+        .autoDescCalendarSource: T(fr: "Source du calendrier", en: "Calendar source", pt: "Fonte do calendário", it: "Fonte calendario", tn: "مصدر الروزنامة"),
+        .autoDescCalOff: T(fr: "Désactivé", en: "Off", pt: "Desativado", it: "Disattivato", tn: "مطفي"),
+        .autoDescCalAgent: T(fr: "Via l'agent (MCP)", en: "Via the agent (MCP)", pt: "Via agente (MCP)", it: "Tramite l'agente (MCP)", tn: "عبر الوكيل (MCP)"),
+        .autoDescCalOAuth: T(fr: "OAuth intégré", en: "Built-in OAuth", pt: "OAuth integrado", it: "OAuth integrato", tn: "OAuth مدمج"),
+        .autoDescCalAgentHelp: T(fr: "L'agent Claude récupère lui-même tes réunions via son MCP Google Calendar. Configure un MCP calendrier dans ta config Claude (CLAUDE_CONFIG_DIR) et pré-autorise ses outils. Aucune clé à saisir ici.", en: "The Claude agent fetches your meetings itself via its Google Calendar MCP. Set up a calendar MCP in your Claude config (CLAUDE_CONFIG_DIR) and pre-allow its tools. No keys to enter here.", pt: "O agente Claude busca as reuniões via seu MCP Google Calendar. Configure um MCP de calendário na sua config Claude (CLAUDE_CONFIG_DIR) e pré-autorize as ferramentas. Sem chaves aqui.", it: "L'agente Claude recupera le riunioni tramite il suo MCP Google Calendar. Configura un MCP calendario nella config Claude (CLAUDE_CONFIG_DIR) e pre-autorizza gli strumenti. Nessuna chiave qui.", tn: "الوكيل Claude يجيب الاجتماعات بروحو عبر MCP Google Calendar. عمّر MCP روزنامة في config Claude (CLAUDE_CONFIG_DIR) وسمح لأدواتو. ما فماش مفاتيح هنا."),
 
         .noProject: T(fr: "Sans projet", en: "No project", pt: "Sem projeto", it: "Nessun progetto", tn: "بلا مشروع"),
         .searchProject: T(fr: "Rechercher un projet…", en: "Search a project…", pt: "Buscar um projeto…", it: "Cerca un progetto…", tn: "لوّج على مشروع…"),

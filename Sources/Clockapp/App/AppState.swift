@@ -304,8 +304,12 @@ final class AppState: ObservableObject {
                 }
             }
 
-            let calendarText = await todaysCalendarText(for: day)
-            let prompt = AutoDescriptionService.buildPrompt(entries: infos, folderContexts: contexts, calendar: calendarText)
+            // Calendar context: either the app fetches it (OAuth), or we tell the agent to
+            // fetch it itself via its Google Calendar MCP tools.
+            let calendarText = autoDescription.calendarSource == .oauth ? await todaysCalendarText(for: day) : nil
+            let agentDay = autoDescription.calendarSource == .agent ? day : nil
+            let prompt = AutoDescriptionService.buildPrompt(entries: infos, folderContexts: contexts,
+                                                            calendar: calendarText, agentCalendarDay: agentDay)
             do {
                 let output = try await AutoDescriptionService.runClaude(
                     command: autoDescription.claudeCommand, prompt: prompt)
@@ -342,8 +346,8 @@ final class AppState: ObservableObject {
                 KeychainStore.shared.googleClientSecret = secret
                 KeychainStore.shared.googleRefreshToken = refresh
                 googleConnected = true
-                if !autoDescription.googleCalendarEnabled {
-                    autoDescription.googleCalendarEnabled = true
+                if autoDescription.calendarSource != .oauth {
+                    autoDescription.calendarSource = .oauth
                     save()
                 }
             } catch {
@@ -362,7 +366,7 @@ final class AppState: ObservableObject {
     /// The day's meetings as a newline-joined text, or nil when disabled/unavailable.
     /// Never throws — calendar context is best-effort and must not block description generation.
     private func todaysCalendarText(for day: Date) async -> String? {
-        guard autoDescription.googleCalendarEnabled, googleConnected else { return nil }
+        guard autoDescription.calendarSource == .oauth, googleConnected else { return nil }
         let clientId = autoDescription.googleClientId.trimmingCharacters(in: .whitespaces)
         guard !clientId.isEmpty,
               let secret = KeychainStore.shared.googleClientSecret,
