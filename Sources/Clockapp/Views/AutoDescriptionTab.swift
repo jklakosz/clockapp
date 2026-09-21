@@ -79,6 +79,8 @@ struct AutoDescriptionTab: View {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
+        panel.showsHiddenFiles = true // reveal dotfolders like ~/.claude
+        panel.treatsFilePackagesAsDirectories = true
         return panel.runModal() == .OK ? panel.url?.path : nil
     }
 

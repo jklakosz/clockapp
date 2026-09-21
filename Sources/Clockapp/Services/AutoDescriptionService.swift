@@ -22,7 +22,9 @@ enum AutoDescriptionService {
     /// Extracted text from the sessions in `folderPath` that were active on `day`.
     static func sessionsText(root: String, folderPath: String, day: Date,
                              maxChars: Int = 14000) -> String {
-        let dir = (root as NSString).appendingPathComponent(encodedDir(for: folderPath))
+        // Expand `~` so a typed path encodes to the same dir name Claude created.
+        let absFolder = (folderPath as NSString).expandingTildeInPath
+        let dir = (root as NSString).appendingPathComponent(encodedDir(for: absFolder))
         let fm = FileManager.default
         guard let files = try? fm.contentsOfDirectory(atPath: dir) else { return "" }
         let cal = Calendar.current

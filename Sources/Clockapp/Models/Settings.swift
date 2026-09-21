@@ -181,10 +181,9 @@ struct AutoDescription: Codable, Equatable {
         scheduledMinuteOfDay = try c.decodeIfPresent(Int.self, forKey: .scheduledMinuteOfDay) ?? 18 * 60
     }
 
-    /// The effective Claude sessions root (falls back to ~/.claude/projects).
+    /// The effective Claude sessions root (falls back to ~/.claude/projects), with `~` expanded.
     var effectiveSessionsRoot: String {
-        claudeSessionsRoot.isEmpty
-            ? (NSHomeDirectory() as NSString).appendingPathComponent(".claude/projects")
-            : claudeSessionsRoot
+        let raw = claudeSessionsRoot.isEmpty ? "~/.claude/projects" : claudeSessionsRoot
+        return (raw as NSString).expandingTildeInPath
     }
 }
