@@ -127,7 +127,9 @@ enum AutoDescriptionService {
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        process.arguments = ["-lc", "\(resolved) -p \"$(cat '\(tmp.path)')\""]
+        // Interactive login shell (-i) so it sources ~/.zshrc — needed to resolve zsh
+        // aliases (e.g. `ccti`) and PATH entries defined there.
+        process.arguments = ["-ilc", "\(resolved) -p \"$(cat '\(tmp.path)')\""]
         let out = Pipe()
         let err = Pipe()
         process.standardOutput = out
