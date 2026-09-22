@@ -53,7 +53,7 @@ enum LocKey {
     case tabAutoDesc, autoDescEnable, autoDescHelp, autoDescMappings, autoDescProjectFolders
     case autoDescSessionsRoot, autoDescSessionsHelp, autoDescCommand, autoDescCommandHelp
     case autoDescScheduleEnable, autoDescScheduleAt, autoDescGenerate, autoDescRunningLabel, chooseFolder
-    case addEntry
+    case addEntry, autoDescPromptTitle, autoDescPromptHelp, autoDescPromptReset
     // Project picker
     case noProject, searchProject, noResult, noClient, defaultProject
     // Settings
@@ -163,6 +163,9 @@ enum Localization {
         .autoDescRunningLabel: T(fr: "Génération…", en: "Generating…", pt: "Gerando…", it: "Generazione…", tn: "قاعد يولّد…"),
         .chooseFolder: T(fr: "Choisir…", en: "Choose…", pt: "Escolher…", it: "Scegli…", tn: "اختار…"),
         .addEntry: T(fr: "Ajouter une entrée", en: "Add entry", pt: "Adicionar entrada", it: "Aggiungi voce", tn: "زيد إدخال"),
+        .autoDescPromptTitle: T(fr: "Prompt de génération", en: "Generation prompt", pt: "Prompt de geração", it: "Prompt di generazione", tn: "Prompt متاع التوليد"),
+        .autoDescPromptHelp: T(fr: "Prompt envoyé à l'agent pour chaque entrée. Les placeholders {{…}} sont remplis automatiquement.", en: "Prompt sent to the agent for each entry. The {{…}} placeholders are filled automatically.", pt: "Prompt enviado ao agente para cada entrada. Os placeholders {{…}} são preenchidos automaticamente.", it: "Prompt inviato all'agente per ogni voce. I placeholder {{…}} sono riempiti automaticamente.", tn: "الـ Prompt اللي يتبعت للوكيل لكل إدخال. الـ {{…}} تتعمّر أوتوماتيك."),
+        .autoDescPromptReset: T(fr: "Réinitialiser", en: "Reset to default", pt: "Repor padrão", it: "Ripristina", tn: "رجّع للأصل"),
 
         .noProject: T(fr: "Sans projet", en: "No project", pt: "Sem projeto", it: "Nessun progetto", tn: "بلا مشروع"),
         .searchProject: T(fr: "Rechercher un projet…", en: "Search a project…", pt: "Buscar um projeto…", it: "Cerca un progetto…", tn: "لوّج على مشروع…"),

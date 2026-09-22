@@ -164,11 +164,14 @@ struct AutoDescription: Codable, Equatable {
     var claudeCommand = "claude"
     var scheduledEnabled = false
     var scheduledMinuteOfDay = 18 * 60 // 18:00
+    /// Editable per-entry prompt template (empty = use AutoDescriptionService.defaultPromptTemplate).
+    var promptTemplate = ""
 
     init() {}
 
     private enum CodingKeys: String, CodingKey {
         case enabled, mappings, claudeSessionsRoot, claudeCommand, scheduledEnabled, scheduledMinuteOfDay
+        case promptTemplate
     }
 
     init(from decoder: Decoder) throws {
@@ -179,6 +182,7 @@ struct AutoDescription: Codable, Equatable {
         claudeCommand = try c.decodeIfPresent(String.self, forKey: .claudeCommand) ?? "claude"
         scheduledEnabled = try c.decodeIfPresent(Bool.self, forKey: .scheduledEnabled) ?? false
         scheduledMinuteOfDay = try c.decodeIfPresent(Int.self, forKey: .scheduledMinuteOfDay) ?? 18 * 60
+        promptTemplate = try c.decodeIfPresent(String.self, forKey: .promptTemplate) ?? ""
     }
 
     /// The effective Claude sessions root (falls back to ~/.claude/projects), with `~` expanded.

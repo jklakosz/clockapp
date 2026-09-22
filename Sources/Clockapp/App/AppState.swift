@@ -290,6 +290,8 @@ final class AppState: ObservableObject {
             }
 
             // Build one (entry id, prompt) job per entry on the main actor.
+            let template = autoDescription.promptTemplate.isEmpty
+                ? AutoDescriptionService.defaultPromptTemplate : autoDescription.promptTemplate
             let hm = DateFormatter(); hm.dateFormat = "HH:mm"
             var jobs: [(id: String, prompt: String)] = []
             for e in dayEntries {
@@ -300,7 +302,8 @@ final class AppState: ObservableObject {
                     projectName: project(for: e.projectId)?.name,
                     currentDescription: e.description)
                 let sessionText = e.projectId.flatMap { sessionByProject[$0] } ?? ""
-                jobs.append((e.id, AutoDescriptionService.buildEntryPrompt(entry: info, sessionText: sessionText, day: day)))
+                jobs.append((e.id, AutoDescriptionService.buildEntryPrompt(
+                    entry: info, sessionText: sessionText, day: day, template: template)))
             }
 
             // One agent per entry, at most 4 concurrent; individual failures are skipped.

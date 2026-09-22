@@ -9,6 +9,17 @@ struct AutoDescriptionTab: View {
         Binding(get: { state.autoDescription }, set: { state.autoDescription = $0; state.save() })
     }
 
+    /// Shows the effective template (the default when unset); editing stores an override.
+    private var promptBinding: Binding<String> {
+        Binding(
+            get: {
+                let t = state.autoDescription.promptTemplate
+                return t.isEmpty ? AutoDescriptionService.defaultPromptTemplate : t
+            },
+            set: { state.autoDescription.promptTemplate = $0; state.save() }
+        )
+    }
+
     var body: some View {
         Form {
             Section {
@@ -61,6 +72,25 @@ struct AutoDescriptionTab: View {
                     TextField("claude", text: a.claudeCommand).frame(maxWidth: 240)
                 }
                 Text(state.t(.autoDescCommandHelp)).font(.caption).foregroundStyle(.secondary)
+            }
+
+            Section(state.t(.autoDescPromptTitle)) {
+                Text(state.t(.autoDescPromptHelp)).font(.caption).foregroundStyle(.secondary)
+                TextEditor(text: promptBinding)
+                    .font(.system(.caption, design: .monospaced))
+                    .frame(minHeight: 200)
+                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.25)))
+                Text("{{day}} · {{timeRange}} · {{project}} · {{existingDescription}} · {{sessionContext}}")
+                    .font(.caption2).foregroundStyle(.secondary).textSelection(.enabled)
+                HStack {
+                    Spacer()
+                    Button(state.t(.autoDescPromptReset)) {
+                        state.autoDescription.promptTemplate = ""
+                        state.save()
+                    }
+                    .controlSize(.small)
+                    .disabled(state.autoDescription.promptTemplate.isEmpty)
+                }
             }
 
             Section {

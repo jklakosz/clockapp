@@ -94,38 +94,46 @@ enum AutoDescriptionService {
 
     // MARK: - Prompt + invocation
 
-    /// Prompt for a SINGLE entry: asks for just the one-line description text (no JSON).
-    static func buildEntryPrompt(entry: EntryInfo, sessionText: String, day: Date) -> String {
+    /// The default, user-editable prompt template. Placeholders (`{{…}}`) are filled per
+    /// entry by `buildEntryPrompt`: {{day}}, {{timeRange}}, {{project}},
+    /// {{existingDescription}}, {{sessionContext}}.
+    static let defaultPromptTemplate = """
+    You write ONE short timesheet description for a single time entry.
+
+    Rules:
+    - Write in ENGLISH, professional timesheet style, one line, max ~140 chars.
+    - Do NOT use em dashes (—) or en dashes (–). Use commas, "and", or a colon instead.
+    - Return ONLY the description text: no quotes, no JSON, no code fences, no preamble.
+    - FIRST use your Google Calendar tools: list your calendars (including shared work \
+    calendars) and find meetings/events overlapping this entry's window on {{day}}. \
+    Consider ONLY those meetings that have been accepted (your response status is accepted). \
+    Do this even when there is session content; ignore all-day, PTO and clearly personal \
+    events. If the calendar tools are unavailable, skip this step.
+    - If there is NO relevant Claude session content AND NO accepted meeting for this entry, \
+    respond EXACTLY with: No session/meeting
+
+    ENTRY: {{timeRange}} on {{day}} for project {{project}}
+    {{existingDescription}}
+
+    {{sessionContext}}
+
+    Description:
+    """
+
+    /// Prompt for a SINGLE entry: fills `template`'s placeholders and asks for just the
+    /// one-line description text (no JSON).
+    static func buildEntryPrompt(entry: EntryInfo, sessionText: String, day: Date, template: String) -> String {
         let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd (EEEE)"; df.locale = Locale(identifier: "en_US")
-        let dayStr = df.string(from: day)
-        let proj = entry.projectName.map { " for project \($0)" } ?? ""
-        var p = """
-        You write ONE short timesheet description for a single time entry.
-
-        Rules:
-        - Write in ENGLISH, professional timesheet style, one line, max ~140 chars.
-        - Do NOT use em dashes (—) or en dashes (–). Use commas, "and", or a colon instead.
-        - Return ONLY the description text: no quotes, no JSON, no code fences, no preamble.
-        - FIRST use your Google Calendar tools: list your calendars (including shared work
-          calendars) and find meetings/events overlapping this entry's window on \(dayStr).
-          Do this even when there is session content. Base the description on a real meeting
-          you attended in this window; ignore all-day, PTO and clearly personal events. If the
-          calendar tools are unavailable, skip this step.
-        - If there is NO relevant Claude session content AND NO meeting for this entry,
-          respond EXACTLY with: No session/meeting
-
-        ENTRY: \(entry.timeRange) on \(dayStr)\(proj)
-        """
-        if !entry.currentDescription.isEmpty {
-            p += "\nExisting description: \(entry.currentDescription)"
-        }
-        if sessionText.isEmpty {
-            p += "\n\n(No Claude session text for this entry's project on this day.)"
-        } else {
-            p += "\n\nClaude session context (this project, whole day):\n\(sessionText)"
-        }
-        p += "\n\nDescription:"
-        return p
+        let existing = entry.currentDescription.isEmpty ? "" : "Existing description: \(entry.currentDescription)"
+        let session = sessionText.isEmpty
+            ? "(No Claude session text for this entry's project on this day.)"
+            : "Claude session context (this project, whole day):\n\(sessionText)"
+        return template
+            .replacingOccurrences(of: "{{day}}", with: df.string(from: day))
+            .replacingOccurrences(of: "{{timeRange}}", with: entry.timeRange)
+            .replacingOccurrences(of: "{{project}}", with: entry.projectName ?? "no specific project")
+            .replacingOccurrences(of: "{{existingDescription}}", with: existing)
+            .replacingOccurrences(of: "{{sessionContext}}", with: session)
     }
 
     /// Resolves a bare command (e.g. `claude`) to an absolute path, since a GUI app's
