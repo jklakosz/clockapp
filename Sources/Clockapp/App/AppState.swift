@@ -340,6 +340,40 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Generates a description for ONE entry (its own `claude -p` run) and returns it,
+    /// so the editor can fill its field. Independent of the per-day run. Nil on failure.
+    func describeEntry(_ entry: TimeEntry) async -> String? {
+        autoDescError = nil
+        let day = entry.start
+        var sessionText = ""
+        if let pid = entry.projectId,
+           let m = autoDescription.mappings.first(where: { $0.projectId == pid }), !m.folderPath.isEmpty {
+            sessionText = AutoDescriptionService.sessionsText(
+                root: autoDescription.effectiveSessionsRoot, folderPath: m.folderPath, day: day)
+        }
+        let hm = DateFormatter(); hm.dateFormat = "HH:mm"
+        let end = entry.end.map { hm.string(from: $0) } ?? "…"
+        let info = AutoDescriptionService.EntryInfo(
+            id: entry.id,
+            timeRange: "\(hm.string(from: entry.start))–\(end)",
+            projectName: project(for: entry.projectId)?.name,
+            currentDescription: entry.description)
+        let template = autoDescription.promptTemplate.isEmpty
+            ? AutoDescriptionService.defaultPromptTemplate : autoDescription.promptTemplate
+        let prompt = AutoDescriptionService.buildEntryPrompt(
+            entry: info, sessionText: sessionText, day: day, template: template)
+        do {
+            let out = try await AutoDescriptionService.runClaude(
+                command: autoDescription.claudeCommand, prompt: prompt,
+                allowedTools: AutoDescriptionService.googleCalendarTools)
+            let desc = AutoDescriptionService.parseSingleDescription(from: out)
+            return desc.isEmpty ? nil : desc
+        } catch {
+            autoDescError = error.localizedDescription
+            return nil
+        }
+    }
+
     /// Applies the (possibly edited) review descriptions to Clockify.
     func publishReview() {
         for item in reviewItems {

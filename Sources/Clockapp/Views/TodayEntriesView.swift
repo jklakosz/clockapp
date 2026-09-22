@@ -229,6 +229,7 @@ private struct EntryRow: View {
     @State private var editEnd = Date()
     @State private var editDesc = ""
     @State private var editProjectId: String?
+    @State private var describing = false
 
     private static let hhmm: DateFormatter = {
         let f = DateFormatter(); f.dateFormat = "HH:mm"; return f
@@ -278,6 +279,26 @@ private struct EntryRow: View {
             MultilineDescriptionField(text: $editDesc, placeholder: state.t(.description)) {}
                 .frame(height: 58)
                 .frame(maxWidth: .infinity)
+            if state.autoDescription.enabled {
+                HStack {
+                    Spacer()
+                    Button {
+                        describing = true
+                        Task {
+                            if let d = await state.describeEntry(entry) { editDesc = d }
+                            describing = false
+                        }
+                    } label: {
+                        if describing {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Label(state.t(.autoDescGenerate), systemImage: "wand.and.stars")
+                        }
+                    }
+                    .controlSize(.small)
+                    .disabled(describing)
+                }
+            }
             ProjectPicker(projects: state.projects, selection: $editProjectId,
                           label: state.t(.project))
             HStack(spacing: 8) {
