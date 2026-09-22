@@ -627,15 +627,24 @@ final class AppState: ObservableObject {
 
     // MARK: - Nudges
 
-    /// Fires the scheduled auto-description once at the configured time each day.
+    /// Fires the scheduled auto-description once per day, at (or shortly after) the
+    /// configured time. A 30-minute catch-up window covers ticks missed to App Nap while
+    /// the app is in the background; the per-day guard keeps it to a single run.
     private func maybeAutoDescribe() {
         guard autoDescription.enabled, autoDescription.scheduledEnabled, !isAutoDescribing else { return }
         let comps = Calendar.current.dateComponents([.hour, .minute], from: now)
         let minuteOfDay = (comps.hour ?? 0) * 60 + (comps.minute ?? 0)
-        guard minuteOfDay == autoDescription.scheduledMinuteOfDay else { return }
+        let scheduled = autoDescription.scheduledMinuteOfDay
+        guard minuteOfDay >= scheduled, minuteOfDay <= scheduled + 30 else { return }
         if let last = lastAutoDescRun, Calendar.current.isDate(last, inSameDayAs: now) { return }
         lastAutoDescRun = now
-        runAutoDescription(for: now)
+        let day = now
+        Task {
+            // The scheduled run may fire with the Entries tab never opened, so its history
+            // cache is empty — reload today's entries from Clockify before generating.
+            await reloadHistory()
+            runAutoDescription(for: day)
+        }
     }
 
     private func maybeNudge() {
