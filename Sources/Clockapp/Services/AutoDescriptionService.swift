@@ -95,23 +95,34 @@ enum AutoDescriptionService {
     // MARK: - Prompt + invocation
 
     /// Prompt for a SINGLE entry: asks for just the one-line description text (no JSON).
-    static func buildEntryPrompt(entry: EntryInfo, sessionText: String) -> String {
-        let proj = entry.projectName.map { " [\($0)]" } ?? ""
+    static func buildEntryPrompt(entry: EntryInfo, sessionText: String, day: Date) -> String {
+        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd (EEEE)"; df.locale = Locale(identifier: "en_US")
+        let dayStr = df.string(from: day)
+        let proj = entry.projectName.map { " for project \($0)" } ?? ""
         var p = """
-        You write ONE short timesheet description for a single time entry, based on the
-        Claude coding session context below. Return ONLY the description — one line, max
-        ~140 chars, professional, timesheet-style, in the same language as the existing
-        description (default English). No quotes, no JSON, no code fences, no preamble.
+        You write ONE short timesheet description for a single time entry.
 
-        ENTRY: \(entry.timeRange)\(proj)
+        Rules:
+        - Write in ENGLISH, professional timesheet style, one line, max ~140 chars.
+        - Do NOT use em dashes (—) or en dashes (–). Use commas, "and", or a colon instead.
+        - Return ONLY the description text: no quotes, no JSON, no code fences, no preamble.
+        - FIRST use your Google Calendar tools: list your calendars (including shared work
+          calendars) and find meetings/events overlapping this entry's window on \(dayStr).
+          Do this even when there is session content. Base the description on a real meeting
+          you attended in this window; ignore all-day, PTO and clearly personal events. If the
+          calendar tools are unavailable, skip this step.
+        - If there is NO relevant Claude session content AND NO meeting for this entry,
+          respond EXACTLY with: No session/meeting
+
+        ENTRY: \(entry.timeRange) on \(dayStr)\(proj)
         """
         if !entry.currentDescription.isEmpty {
             p += "\nExisting description: \(entry.currentDescription)"
         }
         if sessionText.isEmpty {
-            p += "\n\n(No Claude session context available — infer from the entry above.)"
+            p += "\n\n(No Claude session text for this entry's project on this day.)"
         } else {
-            p += "\n\nClaude session context:\n\(sessionText)"
+            p += "\n\nClaude session context (this project, whole day):\n\(sessionText)"
         }
         p += "\n\nDescription:"
         return p
@@ -154,22 +165,35 @@ enum AutoDescriptionService {
         return env
     }
 
+    /// Google Calendar (read-only) MCP tools the agent may use to pull the entry's meetings.
+    /// Passed as `--allowedTools …` so `claude -p` doesn't prompt. If the agent's config has
+    /// no such connector, the flag is harmless and the agent proceeds without calendar.
+    static let googleCalendarTools = [
+        "mcp__claude_ai_Google_Calendar__list_events",
+        "mcp__claude_ai_Google_Calendar__list_calendars",
+        "mcp__claude_ai_Google_Calendar__search_events",
+    ]
+
     /// Runs `<command> -p` with the prompt and returns stdout. Non-blocking.
     ///
     /// Uses a plain `/bin/sh -c` (no zsh, no interactive shell — those source `~/.zshrc`,
     /// which is slow and can hang a GUI app). `$HOME` and env prefixes like
     /// `CLAUDE_CONFIG_DIR=… claude` still work; a bare `claude` is resolved to an absolute
     /// path, and PATH is enriched with the usual install dirs so custom commands resolve too.
-    static func runClaude(command: String, prompt: String) async throws -> String {
+    /// `allowedTools`, when set, is appended as `--allowedTools t1 t2 …` (names are safe idents).
+    static func runClaude(command: String, prompt: String, allowedTools: [String] = []) async throws -> String {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("clockapp-adesc-\(UUID().uuidString).txt")
         try prompt.write(to: tmp, atomically: true, encoding: .utf8)
         let resolved = resolveCommand(command)
+        let toolsFlag = allowedTools.isEmpty ? "" : " --allowedTools " + allowedTools.joined(separator: " ")
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
-        process.arguments = ["-c", "\(resolved) -p \"$(cat '\(tmp.path)')\""]
+        process.arguments = ["-c", "\(resolved) -p \"$(cat '\(tmp.path)')\"\(toolsFlag)"]
         process.environment = enrichedEnvironment()
+        // No stdin: `claude` otherwise waits ~3s for piped input before proceeding.
+        process.standardInput = FileHandle.nullDevice
         let out = Pipe()
         let err = Pipe()
         process.standardOutput = out

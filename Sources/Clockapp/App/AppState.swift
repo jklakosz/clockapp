@@ -300,11 +300,13 @@ final class AppState: ObservableObject {
                     projectName: project(for: e.projectId)?.name,
                     currentDescription: e.description)
                 let sessionText = e.projectId.flatMap { sessionByProject[$0] } ?? ""
-                jobs.append((e.id, AutoDescriptionService.buildEntryPrompt(entry: info, sessionText: sessionText)))
+                jobs.append((e.id, AutoDescriptionService.buildEntryPrompt(entry: info, sessionText: sessionText, day: day)))
             }
 
             // One agent per entry, at most 4 concurrent; individual failures are skipped.
+            // Each agent may read the day's meetings via its Google Calendar MCP tools.
             let command = autoDescription.claudeCommand
+            let tools = AutoDescriptionService.googleCalendarTools
             let maxConcurrent = min(4, jobs.count)
             let proposals = await withTaskGroup(of: (id: String, description: String)?.self) { group -> [(id: String, description: String)] in
                 var next = 0
@@ -312,7 +314,7 @@ final class AppState: ObservableObject {
                     guard next < jobs.count else { return }
                     let job = jobs[next]; next += 1
                     group.addTask {
-                        guard let out = try? await AutoDescriptionService.runClaude(command: command, prompt: job.prompt)
+                        guard let out = try? await AutoDescriptionService.runClaude(command: command, prompt: job.prompt, allowedTools: tools)
                         else { return nil }
                         let desc = AutoDescriptionService.parseSingleDescription(from: out)
                         return desc.isEmpty ? nil : (id: job.id, description: desc)
