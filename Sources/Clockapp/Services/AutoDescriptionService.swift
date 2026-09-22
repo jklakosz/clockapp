@@ -26,22 +26,41 @@ enum AutoDescriptionService {
         let absFolder = (folderPath as NSString).expandingTildeInPath
         let dir = (root as NSString).appendingPathComponent(encodedDir(for: absFolder))
         let fm = FileManager.default
-        guard let files = try? fm.contentsOfDirectory(atPath: dir) else { return "" }
+        guard let names = try? fm.contentsOfDirectory(atPath: dir) else { return "" }
         let cal = Calendar.current
+        let dayStart = cal.startOfDay(for: day)
+
+        // Files that *may* contain `day`'s messages: those last modified on/after that day
+        // (a file last touched earlier cannot hold messages from `day`). Newest first, so
+        // the most recent session — usually the relevant one — wins the char budget.
+        let candidates: [(path: String, mod: Date)] = names
+            .filter { $0.hasSuffix(".jsonl") }
+            .compactMap { name in
+                let path = (dir as NSString).appendingPathComponent(name)
+                guard let attrs = try? fm.attributesOfItem(atPath: path),
+                      let mod = attrs[.modificationDate] as? Date, mod >= dayStart else { return nil }
+                return (path, mod)
+            }
+            .sorted { $0.mod > $1.mod }
 
         var out = ""
-        for name in files.sorted() where name.hasSuffix(".jsonl") {
-            let path = (dir as NSString).appendingPathComponent(name)
-            if let attrs = try? fm.attributesOfItem(atPath: path),
-               let mod = attrs[.modificationDate] as? Date,
-               !cal.isDate(mod, inSameDayAs: day) { continue }
-            out += extractText(fromJSONL: path, day: day, cal: cal)
+        for c in candidates {
+            out += extractText(fromJSONL: c.path, day: day, cal: cal)
             if out.count >= maxChars { break }
         }
         return String(out.prefix(maxChars))
     }
 
-    /// Pulls user prompts and assistant text (skipping tool noise) from a session file.
+    private static let isoWithFractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; return f
+    }()
+    private static let isoPlain: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime]; return f
+    }()
+
+    /// Pulls user prompts and assistant text (skipping tool noise) from a session file,
+    /// keeping ONLY messages whose timestamp falls on `day` — a resumed session file can
+    /// span many days, so filtering by file mtime alone would leak older days' content.
     private static func extractText(fromJSONL path: String, day: Date, cal: Calendar) -> String {
         guard let content = try? String(contentsOfFile: path, encoding: .utf8) else { return "" }
         var lines: [String] = []
@@ -50,6 +69,10 @@ enum AutoDescriptionService {
                   let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
             let type = obj["type"] as? String
             guard type == "user" || type == "assistant" else { continue }
+            // Require a timestamp on `day`; drop lines we can't confirm belong to it.
+            guard let ts = obj["timestamp"] as? String,
+                  let date = isoWithFractional.date(from: ts) ?? isoPlain.date(from: ts),
+                  cal.isDate(date, inSameDayAs: day) else { continue }
             guard let message = obj["message"] as? [String: Any] else { continue }
             let role = (message["role"] as? String) ?? (type ?? "")
             let text = textFromContent(message["content"])
