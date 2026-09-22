@@ -23,10 +23,10 @@ struct ReviewEntriesView: View {
                                     Text("· \(p)").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                                 }
                             }
-                            TextField("Description", text: $state.reviewItems[i].description, axis: .vertical)
-                                .textFieldStyle(.roundedBorder)
-                                .lineLimit(6)
-                                .frame(minHeight: 44, alignment: .top)
+                            MultilineDescriptionField(text: $state.reviewItems[i].description,
+                                                      placeholder: state.t(.description)) {}
+                                .frame(height: 60)
+                                .frame(maxWidth: .infinity)
                         }
                         .padding(8)
                         .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6))

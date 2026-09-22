@@ -207,10 +207,9 @@ private struct EntryRow: View {
 
     private var editor: some View {
         VStack(alignment: .leading, spacing: 8) {
-            TextField(state.t(.description), text: $editDesc, axis: .vertical)
-                .textFieldStyle(.roundedBorder)
-                .lineLimit(6)
-                .frame(minHeight: 44, alignment: .top)
+            MultilineDescriptionField(text: $editDesc, placeholder: state.t(.description)) {}
+                .frame(height: 58)
+                .frame(maxWidth: .infinity)
             ProjectPicker(projects: state.projects, selection: $editProjectId,
                           label: state.t(.project))
             HStack(spacing: 8) {
