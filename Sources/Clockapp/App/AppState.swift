@@ -30,10 +30,6 @@ final class AppState: ObservableObject {
     /// The day currently being auto-described (nil = idle), so only that day's button spins.
     @Published var autoDescRunningDay: Date?
     @Published var autoDescError: String?
-    /// Whether a Google Calendar refresh token is stored (i.e. account connected).
-    @Published var googleConnected = false
-    /// True while the OAuth consent flow is in progress.
-    @Published var googleConnecting = false
 
     var isAutoDescribing: Bool { autoDescRunningDay != nil }
     func isAutoDescribing(day: Date) -> Bool {
@@ -106,7 +102,6 @@ final class AppState: ObservableObject {
         goals = state.goals
         earnings = state.earnings
         autoDescription = state.autoDescription
-        googleConnected = KeychainStore.shared.googleRefreshToken != nil
         windows = state.windows
         projects = state.projects
         recentEntries = state.recentEntries
@@ -272,8 +267,9 @@ final class AppState: ObservableObject {
 
     // MARK: - Auto description
 
-    /// Generates descriptions for a day's entries from mapped Claude sessions (via
-    /// `claude -p`), then opens the review popup with the proposals.
+    /// Generates a description for EACH of a day's entries via its own `claude -p` run
+    /// (one agent per entry, so contexts don't bleed between entries), then opens the
+    /// review popup with the proposals. Runs at most 4 agents at once.
     func runAutoDescription(for day: Date) {
         guard autoDescRunningDay == nil else { return }
         autoDescRunningDay = Calendar.current.startOfDay(for: day)
@@ -284,103 +280,58 @@ final class AppState: ObservableObject {
             let dayEntries = listEntries.filter { cal.isDate($0.start, inSameDayAs: day) && $0.end != nil }
             guard !dayEntries.isEmpty else { autoDescError = "Aucune entrée ce jour."; return }
 
-            let hm = DateFormatter(); hm.dateFormat = "HH:mm"
-            let infos: [AutoDescriptionService.EntryInfo] = dayEntries.map { e in
-                let end = e.end.map { hm.string(from: $0) } ?? "…"
-                return .init(id: e.id,
-                             timeRange: "\(hm.string(from: e.start))–\(end)",
-                             projectName: project(for: e.projectId)?.name,
-                             currentDescription: e.description)
-            }
-
-            let presentProjects = Set(dayEntries.compactMap { $0.projectId })
+            // Read each mapped project folder's sessions once (shared by that project's entries).
             let root = autoDescription.effectiveSessionsRoot
-            var contexts: [(project: String, text: String)] = []
+            var sessionByProject: [String: String] = [:]
             for m in autoDescription.mappings {
-                guard let pid = m.projectId, presentProjects.contains(pid), !m.folderPath.isEmpty else { continue }
+                guard let pid = m.projectId, !m.folderPath.isEmpty else { continue }
                 let text = AutoDescriptionService.sessionsText(root: root, folderPath: m.folderPath, day: day)
-                if !text.isEmpty {
-                    contexts.append((project: project(for: pid)?.name ?? m.folderPath, text: text))
-                }
+                if !text.isEmpty { sessionByProject[pid] = text }
             }
 
-            // Calendar context: either the app fetches it (OAuth), or we tell the agent to
-            // fetch it itself via its Google Calendar MCP tools.
-            let calendarText = autoDescription.calendarSource == .oauth ? await todaysCalendarText(for: day) : nil
-            let agentDay = autoDescription.calendarSource == .agent ? day : nil
-            let prompt = AutoDescriptionService.buildPrompt(entries: infos, folderContexts: contexts,
-                                                            calendar: calendarText, agentCalendarDay: agentDay)
-            let allowedTools = autoDescription.calendarSource == .agent ? AutoDescriptionService.googleCalendarTools : []
-            do {
-                let output = try await AutoDescriptionService.runClaude(
-                    command: autoDescription.claudeCommand, prompt: prompt, allowedTools: allowedTools)
-                let descs = AutoDescriptionService.parseDescriptions(from: output)
-                let proposals = descs.compactMap { (id, desc) -> (id: String, description: String)? in
-                    dayEntries.contains(where: { $0.id == id }) ? (id, desc) : nil
-                }
-                guard !proposals.isEmpty else { autoDescError = "Aucune description générée."; return }
-                openReview(proposals: proposals)
-            } catch {
-                autoDescError = error.localizedDescription
+            // Build one (entry id, prompt) job per entry on the main actor.
+            let hm = DateFormatter(); hm.dateFormat = "HH:mm"
+            var jobs: [(id: String, prompt: String)] = []
+            for e in dayEntries {
+                let end = e.end.map { hm.string(from: $0) } ?? "…"
+                let info = AutoDescriptionService.EntryInfo(
+                    id: e.id,
+                    timeRange: "\(hm.string(from: e.start))–\(end)",
+                    projectName: project(for: e.projectId)?.name,
+                    currentDescription: e.description)
+                let sessionText = e.projectId.flatMap { sessionByProject[$0] } ?? ""
+                jobs.append((e.id, AutoDescriptionService.buildEntryPrompt(entry: info, sessionText: sessionText)))
             }
-        }
-    }
 
-    // MARK: - Google Calendar
-
-    /// Runs the OAuth consent flow in the browser and stores the resulting refresh token
-    /// (plus the client secret) in the Keychain. `clientId` comes from the settings field.
-    func googleConnect(clientSecret: String) {
-        let clientId = autoDescription.googleClientId.trimmingCharacters(in: .whitespaces)
-        let secret = clientSecret.trimmingCharacters(in: .whitespaces)
-        guard !clientId.isEmpty, !secret.isEmpty else {
-            autoDescError = "Renseigne le Client ID et le Client Secret Google."
-            return
-        }
-        guard !googleConnecting else { return }
-        googleConnecting = true
-        autoDescError = nil
-        Task {
-            defer { googleConnecting = false }
-            do {
-                let refresh = try await GoogleCalendarService.authorize(clientId: clientId, clientSecret: secret)
-                KeychainStore.shared.googleClientSecret = secret
-                KeychainStore.shared.googleRefreshToken = refresh
-                googleConnected = true
-                if autoDescription.calendarSource != .oauth {
-                    autoDescription.calendarSource = .oauth
-                    save()
+            // One agent per entry, at most 4 concurrent; individual failures are skipped.
+            let command = autoDescription.claudeCommand
+            let maxConcurrent = min(4, jobs.count)
+            let proposals = await withTaskGroup(of: (id: String, description: String)?.self) { group -> [(id: String, description: String)] in
+                var next = 0
+                func addTask() {
+                    guard next < jobs.count else { return }
+                    let job = jobs[next]; next += 1
+                    group.addTask {
+                        guard let out = try? await AutoDescriptionService.runClaude(command: command, prompt: job.prompt)
+                        else { return nil }
+                        let desc = AutoDescriptionService.parseSingleDescription(from: out)
+                        return desc.isEmpty ? nil : (id: job.id, description: desc)
+                    }
                 }
-            } catch {
-                autoDescError = "Google: \(error.localizedDescription)"
+                for _ in 0..<maxConcurrent { addTask() }
+                var acc: [(id: String, description: String)] = []
+                for await result in group {
+                    if let result { acc.append(result) }
+                    addTask()
+                }
+                return acc
             }
-        }
-    }
 
-    /// Forgets the stored Google tokens.
-    func googleDisconnect() {
-        KeychainStore.shared.googleRefreshToken = nil
-        KeychainStore.shared.googleClientSecret = nil
-        googleConnected = false
-    }
-
-    /// The day's meetings as a newline-joined text, or nil when disabled/unavailable.
-    /// Never throws — calendar context is best-effort and must not block description generation.
-    private func todaysCalendarText(for day: Date) async -> String? {
-        guard autoDescription.calendarSource == .oauth, googleConnected else { return nil }
-        let clientId = autoDescription.googleClientId.trimmingCharacters(in: .whitespaces)
-        guard !clientId.isEmpty,
-              let secret = KeychainStore.shared.googleClientSecret,
-              let refresh = KeychainStore.shared.googleRefreshToken else { return nil }
-        do {
-            let token = try await GoogleCalendarService.accessToken(
-                clientId: clientId, clientSecret: secret, refreshToken: refresh)
-            let events = try await GoogleCalendarService.todaysEvents(accessToken: token, day: day)
-            return events.isEmpty ? nil : events.joined(separator: "\n")
-        } catch {
-            // Surface the issue but keep going without calendar context.
-            autoDescError = "Google Calendar ignoré: \(error.localizedDescription)"
-            return nil
+            guard !proposals.isEmpty else { autoDescError = "Aucune description générée."; return }
+            // Present the review in the entries' on-screen order.
+            let order = Dictionary(uniqueKeysWithValues: jobs.enumerated().map { ($1.id, $0) })
+            let sorted = proposals.sorted { (order[$0.id] ?? 0) < (order[$1.id] ?? 0) }
+            openReview(proposals: sorted)
         }
     }
 

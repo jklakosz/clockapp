@@ -153,14 +153,6 @@ struct ProjectFolder: Codable, Equatable, Identifiable {
     var folderPath: String = ""
 }
 
-/// Where the day's meetings come from when auto-describing.
-enum CalendarSource: String, Codable, CaseIterable, Identifiable {
-    case off      // no calendar context
-    case agent    // the `claude -p` agent fetches events via its own Google Calendar MCP
-    case oauth    // the app fetches events via its built-in Google OAuth flow
-    var id: String { rawValue }
-}
-
 /// Auto-description settings: generate short entry descriptions from the day's Claude
 /// sessions (and meetings) via a `claude -p` invocation, presented in the review popup.
 struct AutoDescription: Codable, Equatable {
@@ -172,18 +164,11 @@ struct AutoDescription: Codable, Equatable {
     var claudeCommand = "claude"
     var scheduledEnabled = false
     var scheduledMinuteOfDay = 18 * 60 // 18:00
-    /// Legacy flag (pre-CalendarSource); kept only to migrate old saved state.
-    var googleCalendarEnabled = false
-    /// Where the day's meetings come from (off / agent MCP / app OAuth).
-    var calendarSource: CalendarSource = .off
-    /// Google OAuth "Desktop app" client id (the secret + tokens live in the Keychain).
-    var googleClientId = ""
 
     init() {}
 
     private enum CodingKeys: String, CodingKey {
         case enabled, mappings, claudeSessionsRoot, claudeCommand, scheduledEnabled, scheduledMinuteOfDay
-        case googleCalendarEnabled, calendarSource, googleClientId
     }
 
     init(from decoder: Decoder) throws {
@@ -194,11 +179,6 @@ struct AutoDescription: Codable, Equatable {
         claudeCommand = try c.decodeIfPresent(String.self, forKey: .claudeCommand) ?? "claude"
         scheduledEnabled = try c.decodeIfPresent(Bool.self, forKey: .scheduledEnabled) ?? false
         scheduledMinuteOfDay = try c.decodeIfPresent(Int.self, forKey: .scheduledMinuteOfDay) ?? 18 * 60
-        googleCalendarEnabled = try c.decodeIfPresent(Bool.self, forKey: .googleCalendarEnabled) ?? false
-        googleClientId = try c.decodeIfPresent(String.self, forKey: .googleClientId) ?? ""
-        // Migrate: old builds only had the OAuth toggle.
-        calendarSource = try c.decodeIfPresent(CalendarSource.self, forKey: .calendarSource)
-            ?? (googleCalendarEnabled ? .oauth : .off)
     }
 
     /// The effective Claude sessions root (falls back to ~/.claude/projects), with `~` expanded.

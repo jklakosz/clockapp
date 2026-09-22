@@ -71,42 +71,26 @@ enum AutoDescriptionService {
 
     // MARK: - Prompt + invocation
 
-    static func buildPrompt(entries: [EntryInfo],
-                            folderContexts: [(project: String, text: String)],
-                            calendar: String?,
-                            agentCalendarDay: Date? = nil) -> String {
+    /// Prompt for a SINGLE entry: asks for just the one-line description text (no JSON).
+    static func buildEntryPrompt(entry: EntryInfo, sessionText: String) -> String {
+        let proj = entry.projectName.map { " [\($0)]" } ?? ""
         var p = """
-        You write short timesheet descriptions of what was worked on during time entries.
-        Given the day's entries and the context (Claude coding sessions and meetings),
-        return ONLY a JSON object mapping each entry id to a concise one-line description
-        (max ~140 chars, professional, timesheet-style, in the same language as the
-        existing descriptions — default English). No prose, no code fences, JSON only.
+        You write ONE short timesheet description for a single time entry, based on the
+        Claude coding session context below. Return ONLY the description — one line, max
+        ~140 chars, professional, timesheet-style, in the same language as the existing
+        description (default English). No quotes, no JSON, no code fences, no preamble.
 
-        ENTRIES:
+        ENTRY: \(entry.timeRange)\(proj)
         """
-        for e in entries {
-            let proj = e.projectName.map { " [\($0)]" } ?? ""
-            let cur = e.currentDescription.isEmpty ? "" : " (current: \(e.currentDescription))"
-            p += "\n- id=\(e.id) | \(e.timeRange)\(proj)\(cur)"
+        if !entry.currentDescription.isEmpty {
+            p += "\nExisting description: \(entry.currentDescription)"
         }
-        if let calendar, !calendar.isEmpty {
-            p += "\n\nMEETINGS TODAY:\n\(calendar)"
+        if sessionText.isEmpty {
+            p += "\n\n(No Claude session context available — infer from the entry above.)"
+        } else {
+            p += "\n\nClaude session context:\n\(sessionText)"
         }
-        if let day = agentCalendarDay {
-            let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd (EEEE)"; df.locale = Locale(identifier: "en_US")
-            p += """
-
-
-            You have Google Calendar tools available (via MCP). Before writing descriptions,
-            fetch the user's calendar events for \(df.string(from: day)) (restrict the query to
-            that single day) and use the meetings/calls as additional context for what was worked
-            on. If you have no calendar access, silently proceed without it — do NOT invent meetings.
-            """
-        }
-        for ctx in folderContexts where !ctx.text.isEmpty {
-            p += "\n\n### Claude sessions — \(ctx.project)\n\(ctx.text)"
-        }
-        p += "\n\nReturn the JSON now:"
+        p += "\n\nDescription:"
         return p
     }
 
@@ -147,32 +131,21 @@ enum AutoDescriptionService {
         return env
     }
 
-    /// MCP tools (read-only) the agent may use to pull the day's meetings in agent mode.
-    /// Passed on the CLI as `--allowedTools …` so `claude -p` doesn't prompt (matches the
-    /// proven setup of the old launchd tui-timesheet job).
-    static let googleCalendarTools = [
-        "mcp__claude_ai_Google_Calendar__list_events",
-        "mcp__claude_ai_Google_Calendar__list_calendars",
-        "mcp__claude_ai_Google_Calendar__search_events",
-    ]
-
     /// Runs `<command> -p` with the prompt and returns stdout. Non-blocking.
     ///
     /// Uses a plain `/bin/sh -c` (no zsh, no interactive shell — those source `~/.zshrc`,
     /// which is slow and can hang a GUI app). `$HOME` and env prefixes like
     /// `CLAUDE_CONFIG_DIR=… claude` still work; a bare `claude` is resolved to an absolute
     /// path, and PATH is enriched with the usual install dirs so custom commands resolve too.
-    /// `allowedTools`, when set, is appended as `--allowedTools t1 t2 …` (names are safe idents).
-    static func runClaude(command: String, prompt: String, allowedTools: [String] = []) async throws -> String {
+    static func runClaude(command: String, prompt: String) async throws -> String {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("clockapp-adesc-\(UUID().uuidString).txt")
         try prompt.write(to: tmp, atomically: true, encoding: .utf8)
         let resolved = resolveCommand(command)
-        let toolsFlag = allowedTools.isEmpty ? "" : " --allowedTools " + allowedTools.joined(separator: " ")
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
-        process.arguments = ["-c", "\(resolved) -p \"$(cat '\(tmp.path)')\"\(toolsFlag)"]
+        process.arguments = ["-c", "\(resolved) -p \"$(cat '\(tmp.path)')\""]
         process.environment = enrichedEnvironment()
         let out = Pipe()
         let err = Pipe()
@@ -194,18 +167,16 @@ enum AutoDescriptionService {
         }
     }
 
-    /// Extracts `{ entryId: description }` from the model output (tolerates surrounding text).
-    static func parseDescriptions(from output: String) -> [String: String] {
-        guard let start = output.firstIndex(of: "{"),
-              let end = output.lastIndex(of: "}"), start < end else { return [:] }
-        let json = String(output[start...end])
-        guard let data = json.data(using: .utf8),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
-        var result: [String: String] = [:]
-        for (k, v) in obj {
-            if let s = v as? String { result[k] = s }
-        }
-        return result
+    /// Extracts a single one-line description from the model output: the last non-empty
+    /// line, stripped of surrounding quotes/backticks and capped in length.
+    static func parseSingleDescription(from output: String) -> String {
+        let lines = output
+            .split(separator: "\n", omittingEmptySubsequences: true)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        guard let last = lines.last else { return "" }
+        let stripped = last.trimmingCharacters(in: CharacterSet(charactersIn: "\"'`“”"))
+        return String(stripped.prefix(200))
     }
 }
 

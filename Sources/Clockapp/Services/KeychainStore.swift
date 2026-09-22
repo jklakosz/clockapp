@@ -1,34 +1,34 @@
 import Foundation
 import Security
 
-/// Minimal Keychain wrapper for the app's secrets (Clockify API key, Google OAuth tokens).
+/// Minimal Keychain wrapper for the single Clockify API key.
 final class KeychainStore {
     static let shared = KeychainStore()
 
     private let service = "com.jules.clockapp"
+    private let account = "clockify-api-key"
 
-    /// Clockify API key.
     var apiKey: String? {
-        get { value(for: "clockify-api-key") }
-        set { setValue(newValue, for: "clockify-api-key") }
+        get { read() }
+        set {
+            if let newValue, !newValue.isEmpty {
+                write(newValue)
+            } else {
+                delete()
+            }
+        }
     }
 
-    /// Google OAuth refresh token (long-lived) — presence means "connected".
-    var googleRefreshToken: String? {
-        get { value(for: "google-refresh-token") }
-        set { setValue(newValue, for: "google-refresh-token") }
+    private func baseQuery() -> [String: Any] {
+        [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+        ]
     }
 
-    /// Google OAuth "Desktop app" client secret (needed to refresh access tokens).
-    var googleClientSecret: String? {
-        get { value(for: "google-client-secret") }
-        set { setValue(newValue, for: "google-client-secret") }
-    }
-
-    // MARK: - Generic access
-
-    func value(for account: String) -> String? {
-        var query = baseQuery(account)
+    private func read() -> String? {
+        var query = baseQuery()
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         var item: CFTypeRef?
@@ -40,25 +40,9 @@ final class KeychainStore {
         return string
     }
 
-    func setValue(_ newValue: String?, for account: String) {
-        if let newValue, !newValue.isEmpty {
-            write(newValue, account: account)
-        } else {
-            SecItemDelete(baseQuery(account) as CFDictionary)
-        }
-    }
-
-    private func baseQuery(_ account: String) -> [String: Any] {
-        [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-        ]
-    }
-
-    private func write(_ value: String, account: String) {
+    private func write(_ value: String) {
         let data = Data(value.utf8)
-        let query = baseQuery(account)
+        let query = baseQuery()
         let attributes: [String: Any] = [kSecValueData as String: data]
         let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
         if status == errSecItemNotFound {
@@ -66,5 +50,9 @@ final class KeychainStore {
             addQuery[kSecValueData as String] = data
             SecItemAdd(addQuery as CFDictionary, nil)
         }
+    }
+
+    private func delete() {
+        SecItemDelete(baseQuery() as CFDictionary)
     }
 }
