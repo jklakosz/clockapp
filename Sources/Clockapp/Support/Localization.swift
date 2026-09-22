@@ -53,6 +53,7 @@ enum LocKey {
     case tabAutoDesc, autoDescEnable, autoDescHelp, autoDescMappings, autoDescProjectFolders
     case autoDescSessionsRoot, autoDescSessionsHelp, autoDescCommand, autoDescCommandHelp
     case autoDescScheduleEnable, autoDescScheduleAt, autoDescGenerate, autoDescRunningLabel, chooseFolder
+    case addEntry
     // Project picker
     case noProject, searchProject, noResult, noClient, defaultProject
     // Settings
@@ -161,6 +162,7 @@ enum Localization {
         .autoDescGenerate: T(fr: "Auto-description", en: "Auto-describe", pt: "Auto-descrever", it: "Auto-descrivi", tn: "وصف أوتوماتيكي"),
         .autoDescRunningLabel: T(fr: "Génération…", en: "Generating…", pt: "Gerando…", it: "Generazione…", tn: "قاعد يولّد…"),
         .chooseFolder: T(fr: "Choisir…", en: "Choose…", pt: "Escolher…", it: "Scegli…", tn: "اختار…"),
+        .addEntry: T(fr: "Ajouter une entrée", en: "Add entry", pt: "Adicionar entrada", it: "Aggiungi voce", tn: "زيد إدخال"),
 
         .noProject: T(fr: "Sans projet", en: "No project", pt: "Sem projeto", it: "Nessun progetto", tn: "بلا مشروع"),
         .searchProject: T(fr: "Rechercher un projet…", en: "Search a project…", pt: "Buscar um projeto…", it: "Cerca un progetto…", tn: "لوّج على مشروع…"),

@@ -1062,6 +1062,32 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Creates a manual, already-finished entry on a chosen day: inserted optimistically,
+    /// then pushed to Clockify (the local id is swapped for the Clockify id on success).
+    func addManualEntry(day: Date, start: Date, end: Date, description: String, projectId: String?) {
+        let billable = project(for: projectId)?.billable ?? false
+        let entry = TimeEntry(start: start, end: end, description: description,
+                              projectId: projectId, billable: billable,
+                              source: .manual, syncState: clockify.isConfigured ? .pending : .local)
+        historyEntries.append(entry)
+        guard clockify.isConfigured else { return }
+        Task {
+            do {
+                let realId = try await clockify.createCompletedEntry(
+                    description: description, projectId: projectId, billable: billable, start: start, end: end)
+                if let i = historyEntries.firstIndex(where: { $0.id == entry.id }) {
+                    historyEntries[i].id = realId
+                    historyEntries[i].syncState = .synced
+                }
+                await refreshTotals(force: true)
+            } catch {
+                if let i = historyEntries.firstIndex(where: { $0.id == entry.id }) {
+                    historyEntries[i].syncState = .failed
+                }
+            }
+        }
+    }
+
     // MARK: - Smart merge
 
     /// Chains that Smart merge would collapse for a single day (>= 2 each).

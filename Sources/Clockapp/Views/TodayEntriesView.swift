@@ -7,6 +7,12 @@ struct TodayEntriesView: View {
     @State private var mergeGroups: [[TimeEntry]] = []
     @State private var showMergeConfirm = false
     @State private var mergeMessage = ""
+    // Manual "add entry" form: the day it's open for, plus its draft fields.
+    @State private var addingDay: Date?
+    @State private var newStart = Date()
+    @State private var newEnd = Date()
+    @State private var newDesc = ""
+    @State private var newProjectId: String?
 
     private func dayLabel(_ day: Date) -> String {
         let f = DateFormatter()
@@ -52,6 +58,9 @@ struct TodayEntriesView: View {
                     LazyVStack(alignment: .leading, spacing: 10) {
                         ForEach(state.listEntriesByDay, id: \.day) { group in
                             dayHeader(group.day, entries: group.entries, total: group.total)
+                            if let addingDay, Calendar.current.isDate(addingDay, inSameDayAs: group.day) {
+                                addEntryForm(day: group.day)
+                            }
                             VStack(spacing: 4) {
                                 ForEach(group.entries) { entry in
                                     EntryRow(
@@ -105,6 +114,12 @@ struct TodayEntriesView: View {
         HStack(spacing: 6) {
             Text(dayLabel(day).capitalized)
                 .font(.caption).fontWeight(.semibold)
+            Button { beginAddEntry(day: day, dayEntries: entries) } label: {
+                Image(systemName: "plus")
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .help(state.t(.addEntry))
             if entries.count >= 2 {
                 Button { prepareMerge(day: day, dayEntries: entries) } label: {
                     Image(systemName: "arrow.triangle.merge")
@@ -145,6 +160,59 @@ struct TodayEntriesView: View {
             mergeMessage = state.t(.mergeMsgFmt, before, before - deleted, deleted)
         }
         showMergeConfirm = true
+    }
+
+    /// Opens the add-entry form for `day`, defaulting the slot to right after the day's
+    /// last entry (or 09:00), one hour long.
+    private func beginAddEntry(day: Date, dayEntries: [TimeEntry]) {
+        let cal = Calendar.current
+        let base = dayEntries.compactMap { $0.end }.max()
+            ?? cal.date(bySettingHour: 9, minute: 0, second: 0, of: day) ?? day
+        newStart = base
+        newEnd = cal.date(byAdding: .hour, value: 1, to: base) ?? base
+        newDesc = ""
+        newProjectId = state.effectiveDefaultProjectId
+        withAnimation(.easeInOut(duration: 0.12)) { addingDay = day }
+    }
+
+    @ViewBuilder private func addEntryForm(day: Date) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            MultilineDescriptionField(text: $newDesc, placeholder: state.t(.description)) {}
+                .frame(height: 44)
+                .frame(maxWidth: .infinity)
+            ProjectPicker(projects: state.projects, selection: $newProjectId, label: state.t(.project))
+            HStack(spacing: 8) {
+                TimeField(date: $newStart)
+                Text("→").foregroundStyle(.secondary)
+                TimeField(date: $newEnd)
+                Spacer()
+            }
+            HStack {
+                Button(state.t(.cancel)) { addingDay = nil }
+                Spacer()
+                Button(state.t(.add)) {
+                    let s = combine(day: day, time: newStart)
+                    let e = combine(day: day, time: newEnd)
+                    state.addManualEntry(day: day, start: s, end: e, description: newDesc, projectId: newProjectId)
+                    addingDay = nil
+                }
+                .keyboardShortcut(.defaultAction)
+                .buttonStyle(.borderedProminent)
+                .disabled(combine(day: day, time: newEnd) <= combine(day: day, time: newStart))
+            }
+        }
+        .padding(8)
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+    }
+
+    /// Combine a calendar day with an edited hour/minute.
+    private func combine(day: Date, time: Date) -> Date {
+        let cal = Calendar.current
+        let d = cal.dateComponents([.year, .month, .day], from: day)
+        let t = cal.dateComponents([.hour, .minute], from: time)
+        var c = DateComponents()
+        c.year = d.year; c.month = d.month; c.day = d.day; c.hour = t.hour; c.minute = t.minute
+        return cal.date(from: c) ?? day
     }
 }
 
