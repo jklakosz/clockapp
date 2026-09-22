@@ -310,9 +310,10 @@ final class AppState: ObservableObject {
             let agentDay = autoDescription.calendarSource == .agent ? day : nil
             let prompt = AutoDescriptionService.buildPrompt(entries: infos, folderContexts: contexts,
                                                             calendar: calendarText, agentCalendarDay: agentDay)
+            let allowedTools = autoDescription.calendarSource == .agent ? AutoDescriptionService.googleCalendarTools : []
             do {
                 let output = try await AutoDescriptionService.runClaude(
-                    command: autoDescription.claudeCommand, prompt: prompt)
+                    command: autoDescription.claudeCommand, prompt: prompt, allowedTools: allowedTools)
                 let descs = AutoDescriptionService.parseDescriptions(from: output)
                 let proposals = descs.compactMap { (id, desc) -> (id: String, description: String)? in
                     dayEntries.contains(where: { $0.id == id }) ? (id, desc) : nil

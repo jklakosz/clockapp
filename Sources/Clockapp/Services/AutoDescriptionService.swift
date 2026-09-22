@@ -147,21 +147,32 @@ enum AutoDescriptionService {
         return env
     }
 
+    /// MCP tools (read-only) the agent may use to pull the day's meetings in agent mode.
+    /// Passed on the CLI as `--allowedTools …` so `claude -p` doesn't prompt (matches the
+    /// proven setup of the old launchd tui-timesheet job).
+    static let googleCalendarTools = [
+        "mcp__claude_ai_Google_Calendar__list_events",
+        "mcp__claude_ai_Google_Calendar__list_calendars",
+        "mcp__claude_ai_Google_Calendar__search_events",
+    ]
+
     /// Runs `<command> -p` with the prompt and returns stdout. Non-blocking.
     ///
     /// Uses a plain `/bin/sh -c` (no zsh, no interactive shell — those source `~/.zshrc`,
     /// which is slow and can hang a GUI app). `$HOME` and env prefixes like
     /// `CLAUDE_CONFIG_DIR=… claude` still work; a bare `claude` is resolved to an absolute
     /// path, and PATH is enriched with the usual install dirs so custom commands resolve too.
-    static func runClaude(command: String, prompt: String) async throws -> String {
+    /// `allowedTools`, when set, is appended as `--allowedTools t1 t2 …` (names are safe idents).
+    static func runClaude(command: String, prompt: String, allowedTools: [String] = []) async throws -> String {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("clockapp-adesc-\(UUID().uuidString).txt")
         try prompt.write(to: tmp, atomically: true, encoding: .utf8)
         let resolved = resolveCommand(command)
+        let toolsFlag = allowedTools.isEmpty ? "" : " --allowedTools " + allowedTools.joined(separator: " ")
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
-        process.arguments = ["-c", "\(resolved) -p \"$(cat '\(tmp.path)')\""]
+        process.arguments = ["-c", "\(resolved) -p \"$(cat '\(tmp.path)')\"\(toolsFlag)"]
         process.environment = enrichedEnvironment()
         let out = Pipe()
         let err = Pipe()
