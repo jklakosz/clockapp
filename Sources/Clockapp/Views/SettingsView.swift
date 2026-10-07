@@ -77,6 +77,12 @@ private struct ClockifyTab: View {
                     get: { state.launchAtLogin },
                     set: { state.setLaunchAtLogin($0) }
                 ))
+                Stepper(state.t(.smartMergeGapFmt, state.settings.smartMergeGapMinutes),
+                        value: Binding(
+                            get: { state.settings.smartMergeGapMinutes },
+                            set: { state.settings.smartMergeGapMinutes = min(10, max(1, $0)); state.save() }
+                        ),
+                        in: 1...10)
             }
 
             Section(state.t(.sectionUpdates)) {

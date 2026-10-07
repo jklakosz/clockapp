@@ -16,6 +16,9 @@ struct AppSettings: Codable, Equatable {
     var receivePrereleases = false
     /// When true, the app runs the local MCP server subprocess.
     var mcpEnabled = false
+    /// Smart-merge gap threshold in minutes (consecutive same-project entries closer than
+    /// this merge). Default 2, clamped to 1...10 in the UI.
+    var smartMergeGapMinutes = 2
 
     init() {}
 
@@ -23,7 +26,7 @@ struct AppSettings: Codable, Equatable {
         case autoTrackEnabled, nudgesEnabled, showSecondsInMenuBar
         case workspaceId, userId, defaultProjectId
         case useLastProjectAsDefault, lastUsedProjectId, language
-        case receivePrereleases, mcpEnabled
+        case receivePrereleases, mcpEnabled, smartMergeGapMinutes
     }
 
     // Tolerant decoding: any missing key (e.g. a field added in a later version) falls
@@ -41,6 +44,7 @@ struct AppSettings: Codable, Equatable {
         language = try c.decodeIfPresent(AppLanguage.self, forKey: .language) ?? .detected()
         receivePrereleases = try c.decodeIfPresent(Bool.self, forKey: .receivePrereleases) ?? false
         mcpEnabled = try c.decodeIfPresent(Bool.self, forKey: .mcpEnabled) ?? false
+        smartMergeGapMinutes = try c.decodeIfPresent(Int.self, forKey: .smartMergeGapMinutes) ?? 2
     }
 }
 

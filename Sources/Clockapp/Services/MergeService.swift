@@ -1,14 +1,16 @@
 import Foundation
 
 /// "Smart merge": collapses chains of consecutive finished entries that are close in
-/// time (gap < 10 min) AND share the same project into a single entry spanning from
-/// the first start to the last end. Different projects break the chain.
+/// time (gap < the configured threshold) AND share the same project into a single entry
+/// spanning from the first start to the last end. Different projects break the chain.
 enum MergeService {
-    static let maxGapSeconds: TimeInterval = 10 * 60
+    /// Default gap threshold (2 min); configurable up to 10 min via settings.
+    static let defaultMaxGapSeconds: TimeInterval = 2 * 60
 
     /// Chains (>= 2 entries) that should be merged, in chronological order.
-    /// Running/unfinished entries are ignored.
-    static func plan(_ entries: [TimeEntry]) -> [[TimeEntry]] {
+    /// Running/unfinished entries are ignored. `maxGapSeconds` is the largest gap between
+    /// consecutive entries that still merges them.
+    static func plan(_ entries: [TimeEntry], maxGapSeconds: TimeInterval = defaultMaxGapSeconds) -> [[TimeEntry]] {
         let sorted = entries.filter { $0.end != nil }.sorted { $0.start < $1.start }
         var groups: [[TimeEntry]] = []
         var current: [TimeEntry] = []

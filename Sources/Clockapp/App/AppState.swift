@@ -1142,7 +1142,8 @@ final class AppState: ObservableObject {
     func smartMergeGroups(on day: Date) -> [[TimeEntry]] {
         let cal = Calendar.current
         let dayEntries = listEntries.filter { cal.isDate($0.start, inSameDayAs: day) }
-        return MergeService.plan(dayEntries)
+        let gap = TimeInterval(min(10, max(1, settings.smartMergeGapMinutes)) * 60)
+        return MergeService.plan(dayEntries, maxGapSeconds: gap)
     }
 
     /// Applies a merge plan: extends the first entry of each chain and deletes the rest,

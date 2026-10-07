@@ -47,7 +47,7 @@ enum LocKey {
     case connConnecting, connError, connOffline, settings, quit, settingsWindowTitle
     // Entries
     case noEntriesToday, noDescription, runningLc, delete, save, description
-    case smartMerge, mergeTitle, mergeMsgFmt, mergeNothing
+    case smartMerge, mergeTitle, mergeMsgFmt, mergeNothing, smartMergeGapFmt
     case reviewTitle, reviewIntro, reviewPublish
     // Auto-description
     case tabAutoDesc, autoDescEnable, autoDescHelp, autoDescMappings, autoDescProjectFolders
@@ -144,6 +144,7 @@ enum Localization {
         .smartMerge: T(fr: "Fusion intelligente", en: "Smart merge", pt: "Mesclagem inteligente", it: "Unione intelligente", tn: "دمج ذكي"),
         .mergeTitle: T(fr: "Fusionner les entrées ?", en: "Merge entries?", pt: "Mesclar entradas?", it: "Unire le voci?", tn: "تدمج الإدخالات؟"),
         .mergeMsgFmt: T(fr: "%d entrées → %d entrées (%d supprimées sur Clockify)", en: "%d entries → %d entries (%d deleted on Clockify)", pt: "%d entradas → %d entradas (%d excluídas no Clockify)", it: "%d voci → %d voci (%d eliminate su Clockify)", tn: "%d إدخالات → %d إدخالات (%d تتفسخ من Clockify)"),
+        .smartMergeGapFmt: T(fr: "Fusion auto : écart max %d min", en: "Smart merge: max gap %d min", pt: "Mesclar: intervalo máx %d min", it: "Unione: intervallo max %d min", tn: "الدمج: أقصى فارق %d دقيقة"),
         .mergeNothing: T(fr: "Rien à fusionner aujourd'hui.", en: "Nothing to merge today.", pt: "Nada para mesclar hoje.", it: "Niente da unire oggi.", tn: "ما فماش شنو تدمج اليوم."),
         .reviewTitle: T(fr: "Vérifier les descriptions", en: "Review descriptions", pt: "Revisar descrições", it: "Rivedi le descrizioni", tn: "راجع الوصوفات"),
         .reviewIntro: T(fr: "Relis et modifie si besoin avant de publier sur Clockify.", en: "Review and edit if needed before publishing to Clockify.", pt: "Revise e edite se necessário antes de publicar no Clockify.", it: "Controlla e modifica se necessario prima di pubblicare su Clockify.", tn: "راجع وبدّل كان يلزم قبل ما تنشر على Clockify."),
