@@ -17,6 +17,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Closes the panel when the user clicks anywhere outside the app.
     private var outsideClickMonitor: Any?
 
+    // Menubar: cache the two SF Symbol images (creating one each second leaks the symbol
+    // cache ~3KB/s) and track the last-rendered state so we only touch the button on change.
+    private lazy var trackingImage: NSImage? = Self.menuSymbol("timer")
+    private lazy var idleImage: NSImage? = Self.menuSymbol("timer.circle")
+    private var lastTrackingState: Bool?
+    private var lastTitle: String?
+
+    private static func menuSymbol(_ name: String) -> NSImage? {
+        let img = NSImage(systemSymbolName: name, accessibilityDescription: "Clockapp")
+        img?.isTemplate = true
+        return img
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
@@ -103,13 +116,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func updateStatusButton() {
         guard let button = statusItem.button else { return }
         let tracking = state.isTracking
-        let image = NSImage(systemSymbolName: tracking ? "timer" : "timer.circle",
-                            accessibilityDescription: "Clockapp")
-        image?.isTemplate = true
-        button.image = image
-        button.title = tracking
+        // Reuse cached images; only assign when the state actually flips.
+        if lastTrackingState != tracking {
+            button.image = tracking ? trackingImage : idleImage
+            lastTrackingState = tracking
+        }
+        let title = tracking
             ? " " + Format.clock(state.elapsed, seconds: state.settings.showSecondsInMenuBar)
             : ""
+        if lastTitle != title {
+            button.title = title
+            lastTitle = title
+        }
     }
 
     // MARK: - Popover
