@@ -280,13 +280,14 @@ final class AppState: ObservableObject {
             let dayEntries = listEntries.filter { cal.isDate($0.start, inSameDayAs: day) && $0.end != nil }
             guard !dayEntries.isEmpty else { autoDescError = "Aucune entrée ce jour."; return }
 
-            // Read each mapped project folder's sessions once (shared by that project's entries).
+            // Parse each mapped project folder's day of sessions once (with timestamps),
+            // then slice per entry by its time window below.
             let root = autoDescription.effectiveSessionsRoot
-            var sessionByProject: [String: String] = [:]
+            var messagesByProject: [String: [AutoDescriptionService.SessionMessage]] = [:]
             for m in autoDescription.mappings {
                 guard let pid = m.projectId, !m.folderPath.isEmpty else { continue }
-                let text = AutoDescriptionService.sessionsText(root: root, folderPath: m.folderPath, day: day)
-                if !text.isEmpty { sessionByProject[pid] = text }
+                let msgs = AutoDescriptionService.sessionMessages(root: root, folderPath: m.folderPath, day: day)
+                if !msgs.isEmpty { messagesByProject[pid] = msgs }
             }
 
             // Build one (entry id, prompt) job per entry on the main actor.
@@ -301,7 +302,9 @@ final class AppState: ObservableObject {
                     timeRange: "\(hm.string(from: e.start))–\(end)",
                     projectName: project(for: e.projectId)?.name,
                     currentDescription: e.description)
-                let sessionText = e.projectId.flatMap { sessionByProject[$0] } ?? ""
+                // Only the sessions written during THIS entry's window.
+                let msgs = e.projectId.flatMap { messagesByProject[$0] } ?? []
+                let sessionText = AutoDescriptionService.windowText(msgs, start: e.start, end: e.end ?? e.start)
                 jobs.append((e.id, AutoDescriptionService.buildEntryPrompt(
                     entry: info, sessionText: sessionText, day: day, template: template)))
             }
@@ -348,8 +351,10 @@ final class AppState: ObservableObject {
         var sessionText = ""
         if let pid = entry.projectId,
            let m = autoDescription.mappings.first(where: { $0.projectId == pid }), !m.folderPath.isEmpty {
-            sessionText = AutoDescriptionService.sessionsText(
+            // Only the sessions written during this entry's window.
+            let msgs = AutoDescriptionService.sessionMessages(
                 root: autoDescription.effectiveSessionsRoot, folderPath: m.folderPath, day: day)
+            sessionText = AutoDescriptionService.windowText(msgs, start: entry.start, end: entry.end ?? Date())
         }
         let hm = DateFormatter(); hm.dateFormat = "HH:mm"
         let end = entry.end.map { hm.string(from: $0) } ?? "…"

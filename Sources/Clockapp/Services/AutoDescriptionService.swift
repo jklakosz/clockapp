@@ -11,6 +11,14 @@ enum AutoDescriptionService {
         let currentDescription: String
     }
 
+    /// One user/assistant message with its timestamp, so we can slice a folder's day of
+    /// sessions down to a single entry's [start, end] window.
+    struct SessionMessage {
+        let date: Date
+        let role: String   // "User" or "Assistant"
+        let text: String
+    }
+
     // MARK: - Claude session directory encoding
 
     /// Claude Code stores sessions under `<root>/<encoded cwd>/*.jsonl`, where the cwd's
@@ -19,33 +27,35 @@ enum AutoDescriptionService {
         String(folderPath.map { $0.isLetter || $0.isNumber ? $0 : "-" })
     }
 
-    /// Extracted text from the sessions in `folderPath` that were active on `day`.
-    static func sessionsText(root: String, folderPath: String, day: Date,
-                             maxChars: Int = 14000) -> String {
+    /// All of `day`'s user/assistant messages (with timestamps) from the sessions in
+    /// `folderPath`, sorted chronologically — so callers can slice them per entry window.
+    static func sessionMessages(root: String, folderPath: String, day: Date) -> [SessionMessage] {
         // Expand `~` so a typed path encodes to the same dir name Claude created.
         let absFolder = (folderPath as NSString).expandingTildeInPath
         let dir = (root as NSString).appendingPathComponent(encodedDir(for: absFolder))
         let fm = FileManager.default
-        guard let names = try? fm.contentsOfDirectory(atPath: dir) else { return "" }
+        guard let names = try? fm.contentsOfDirectory(atPath: dir) else { return [] }
         let cal = Calendar.current
         let dayStart = cal.startOfDay(for: day)
 
-        // Files that *may* contain `day`'s messages: those last modified on/after that day
-        // (a file last touched earlier cannot hold messages from `day`). Newest first, so
-        // the most recent session — usually the relevant one — wins the char budget.
-        let candidates: [(path: String, mod: Date)] = names
-            .filter { $0.hasSuffix(".jsonl") }
-            .compactMap { name in
-                let path = (dir as NSString).appendingPathComponent(name)
-                guard let attrs = try? fm.attributesOfItem(atPath: path),
-                      let mod = attrs[.modificationDate] as? Date, mod >= dayStart else { return nil }
-                return (path, mod)
-            }
-            .sorted { $0.mod > $1.mod }
+        var out: [SessionMessage] = []
+        for name in names where name.hasSuffix(".jsonl") {
+            let path = (dir as NSString).appendingPathComponent(name)
+            // A file last modified before `day` cannot hold `day`'s messages — skip it.
+            guard let attrs = try? fm.attributesOfItem(atPath: path),
+                  let mod = attrs[.modificationDate] as? Date, mod >= dayStart else { continue }
+            out.append(contentsOf: messages(fromJSONL: path, day: day, cal: cal))
+        }
+        return out.sorted { $0.date < $1.date }
+    }
 
+    /// Joins the messages whose timestamp falls in [start, end] into a session context
+    /// block (chronological), capped at `maxChars`.
+    static func windowText(_ messages: [SessionMessage], start: Date, end: Date,
+                           maxChars: Int = 14000) -> String {
         var out = ""
-        for c in candidates {
-            out += extractText(fromJSONL: c.path, day: day, cal: cal)
+        for m in messages where m.date >= start && m.date <= end {
+            out += "\(m.role): \(m.text)\n"
             if out.count >= maxChars { break }
         }
         return String(out.prefix(maxChars))
@@ -58,29 +68,26 @@ enum AutoDescriptionService {
         let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime]; return f
     }()
 
-    /// Pulls user prompts and assistant text (skipping tool noise) from a session file,
-    /// keeping ONLY messages whose timestamp falls on `day` — a resumed session file can
-    /// span many days, so filtering by file mtime alone would leak older days' content.
-    private static func extractText(fromJSONL path: String, day: Date, cal: Calendar) -> String {
-        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else { return "" }
-        var lines: [String] = []
+    /// Parses the user/assistant messages (skipping tool noise) timestamped on `day` from a
+    /// session file — a resumed session file can span many days, so we filter per message.
+    private static func messages(fromJSONL path: String, day: Date, cal: Calendar) -> [SessionMessage] {
+        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else { return [] }
+        var out: [SessionMessage] = []
         for raw in content.split(separator: "\n") {
             guard let data = raw.data(using: .utf8),
                   let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
             let type = obj["type"] as? String
             guard type == "user" || type == "assistant" else { continue }
-            // Require a timestamp on `day`; drop lines we can't confirm belong to it.
             guard let ts = obj["timestamp"] as? String,
                   let date = isoWithFractional.date(from: ts) ?? isoPlain.date(from: ts),
                   cal.isDate(date, inSameDayAs: day) else { continue }
             guard let message = obj["message"] as? [String: Any] else { continue }
             let role = (message["role"] as? String) ?? (type ?? "")
-            let text = textFromContent(message["content"])
-            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { continue }
-            lines.append("\(role == "user" ? "User" : "Assistant"): \(trimmed)")
+            let text = textFromContent(message["content"]).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else { continue }
+            out.append(SessionMessage(date: date, role: role == "user" ? "User" : "Assistant", text: text))
         }
-        return lines.isEmpty ? "" : lines.joined(separator: "\n") + "\n"
+        return out
     }
 
     private static func textFromContent(_ content: Any?) -> String {
